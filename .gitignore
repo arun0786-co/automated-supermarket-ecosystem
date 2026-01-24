@@ -1,0 +1,17 @@
+# Stage A – Node backend
+stage-a-simulation/api-simulator/node_modules/
+stage-a-simulation/api-simulator/dist/
+
+# Stage A – Next.js frontend
+stage-a-simulation/web-dashboard/.next/
+stage-a-simulation/web-dashboard/node_modules/
+
+# Stage B / C (populated later)
+stage-b-mvp/node_modules/
+stage-c-production/node_modules/
+
+# General
+.env
+.env.local
+.DS_Store
+*.log
