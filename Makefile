@@ -1,8 +1,6 @@
 # root-level makefile for the whole project
 # makes it easy to start/stop things without remembering long commands
 
-.PHONY: help stage-a stage-a-api stage-a-web stage-b commit-fix kill
-
 help:
 	@echo ""
 	@echo "  make stage-a       start both stage A servers"
@@ -10,7 +8,6 @@ help:
 	@echo "  make stage-a-web   start web dashboard only"
 	@echo "  make stage-b       start stage B with docker compose"
 	@echo "  make kill          kill anything running on ports 3000 and 3001"
-	@echo "  make commit-fix    rewrite commit messages to remove feat/chore prefixes"
 	@echo ""
 
 stage-a-api:
@@ -36,5 +33,3 @@ kill:
 	lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 	@echo "ports 3000 and 3001 cleared"
 
-commit-fix:
-	chmod +x fix-commits.sh && bash fix-commits.sh
