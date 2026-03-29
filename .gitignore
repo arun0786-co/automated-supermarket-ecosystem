@@ -1,17 +1,26 @@
-# Stage A – Node backend
-stage-a-simulation/api-simulator/node_modules/
-stage-a-simulation/api-simulator/dist/
+# dependencies and build output, in every stage
+node_modules/
+dist/
+.next/
+next-env.d.ts
+*.tsbuildinfo
 
-# Stage A – Next.js frontend
-stage-a-simulation/web-dashboard/.next/
-stage-a-simulation/web-dashboard/node_modules/
+# hardhat
+stage-b-mvp/services/fintech-vault/artifacts/
+stage-b-mvp/services/fintech-vault/cache/
+stage-b-mvp/services/fintech-vault/typechain-types/
 
-# Stage B / C (populated later)
-stage-b-mvp/node_modules/
-stage-c-production/node_modules/
+# python
+__pycache__/
+*.pyc
+.venv/
 
-# General
+# flutter
+stage-a-simulation/mobile-app/.dart_tool/
+stage-a-simulation/mobile-app/build/
+
+# general
 .env
-.env.local
+.env.*
 .DS_Store
 *.log
