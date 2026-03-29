@@ -57,19 +57,18 @@ autimated-supermarket-system/
 │   └── web-dashboard/        # Next.js admin dashboard (live map, ledger, scan feed)
 ├── stage-b-mvp/              # Phase 2 — docker-compose scaffold ready, services to build
 ├── stage-c-production/       # Phase 3 — hardware spec and roadmap
-├── setup.sh                  # run this first to install deps + make initial git commits
+├── Makefile                  # install, start and stop shortcuts
 └── README.md
 ```
 
 ## First Time Setup
 
 ```bash
-chmod +x setup.sh
-./setup.sh
+make install
 ```
 
-This script installs all dependencies, runs a build check, removes any accidental nested
-duplicate folders, and creates the initial git commit history.
+This installs the api-simulator and web-dashboard dependencies. Run `make help` for the
+other shortcuts.
 
 ## Running the Sim (Stage A)
 
