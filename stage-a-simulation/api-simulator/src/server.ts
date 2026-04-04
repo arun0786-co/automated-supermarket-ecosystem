@@ -48,8 +48,8 @@ app.get('/api/wallets/:id', (req, res) => {
 // so i can test the overdraft logic with curl without waiting for a trolley to fill up
 app.post('/api/checkout', (req, res) => {
   const { userId, amount } = req.body;
-  if (!userId || typeof amount !== 'number') {
-    return res.status(400).json({ error: 'userId and amount required' });
+  if (!userId || typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'userId and a positive amount required' });
   }
   res.json(checkout(userId, amount));
 });
