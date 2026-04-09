@@ -35,6 +35,9 @@ test('subscriber can overdraw down to the limit but not past it', () => {
   const w = getWallet('USR-003')!;
   // limit is -50, so balance + 50 is the most this wallet can spend
   assert.equal(checkout('USR-003', w.balance + 51).ok, false);
-  assert.equal(checkout('USR-003', w.balance + 20).ok, true);
+  const res = checkout('USR-003', w.balance + 20);
+  assert.equal(res.ok, true);
+  assert.equal(res.overdraftUsed, 20);
   assert.equal(getWallet('USR-003')!.balance, -20);
+  assert.equal(getLedger(1)[0].type, 'OVERDRAFT');
 });

@@ -19,7 +19,7 @@ export type TxRecord = {
   to: string;
   amount: number;
   timestamp: string;
-  type: 'PURCHASE' | 'TOPUP' | 'OVERDRAFT_RECOVERY';
+  type: 'PURCHASE' | 'OVERDRAFT' | 'TOPUP';
 };
 
 // hardcoded wallets, moves into postgres in stage b
@@ -50,7 +50,9 @@ export function getAllWallets(): WalletEntry[] {
 // "limited overdraft" contract logic from chapter 6 of the spec
 // subscribers can go negative down to their overdraftLimit
 // if they go below that, transaction gets rejected same as insufficient funds
-export function checkout(userId: string, amount: number): { ok: boolean; hash?: string; reason?: string } {
+export type CheckoutResult = { ok: boolean; hash?: string; reason?: string; overdraftUsed?: number };
+
+export function checkout(userId: string, amount: number): CheckoutResult {
   // a negative amount would credit the wallet, so only positive totals are allowed
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, reason: 'invalid amount' };
 
@@ -67,11 +69,13 @@ export function checkout(userId: string, amount: number): { ok: boolean; hash?: 
   }
 
   if (wallet.isSubscriber && projected >= wallet.overdraftLimit) {
-    // subscriber overdraft, balance goes negative, fiat recovery kicks in later
+    // subscriber overdraft, balance goes negative, fiat recovery kicks in later.
+    // matches OverdraftUsed(user, amount - balance) in the spec
+    const overdraftUsed = +(amount - Math.max(wallet.balance, 0)).toFixed(2);
     wallet.balance = +projected.toFixed(2);
     const hash = mineBlock();
-    ledger.push({ hash, blockNumber, from: userId, to: 'STORE_WALLET', amount, timestamp: new Date().toISOString(), type: 'OVERDRAFT_RECOVERY' });
-    return { ok: true, hash };
+    ledger.push({ hash, blockNumber, from: userId, to: 'STORE_WALLET', amount, timestamp: new Date().toISOString(), type: 'OVERDRAFT' });
+    return { ok: true, hash, overdraftUsed };
   }
 
   return { ok: false, reason: 'insufficient funds' };
