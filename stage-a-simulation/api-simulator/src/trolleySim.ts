@@ -116,6 +116,7 @@ export function startTrolleySimulation(broadcast: (data: unknown) => void) {
         x: +t.x.toFixed(1), y: +t.y.toFixed(1),
         status: t.status,
         cartItems: t.cartItems.slice(-3),
+        itemCount: t.cartItems.length,
         totalWeight: t.totalWeight,
         cartTotal: t.cartTotal,
       })),
