@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import { startTrolleySimulation } from './trolleySim';
 import { PRODUCTS, applyDynamicPricing } from './products';
 import { getWallet, getAllWallets, getLedger, checkout, getBlockHeight } from './walletService';
@@ -62,7 +62,7 @@ app.get('/api/ledger', (_req, res) => {
 // broadcast to all open websocket connections, skips any that aren't fully open
 const broadcast = (data: unknown) => {
   wss.clients.forEach((client) => {
-    if (client.readyState === 1) {
+    if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify(data));
     }
   });
