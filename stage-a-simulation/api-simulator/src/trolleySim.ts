@@ -19,6 +19,7 @@ export interface Trolley {
 export interface CartItem {
   sku: string;
   name: string;
+  emoji: string;
   confidence: number;  // 0.0–1.0, YOLOv8 output
   weightDelta: number; // grams from HX711 load cell
   price: number;
@@ -86,15 +87,15 @@ export function startTrolleySimulation(broadcast: (data: unknown) => void) {
           weightDelta = +(actual.weight + (Math.random() - 0.5) * 10).toFixed(1);
         }
 
-        const item: CartItem = { sku: product.sku, name: product.name, confidence, weightDelta, price, discounted, ts: new Date().toISOString() };
-        const { accepted } = fuseScan(product, confidence, weightDelta);
+        const item: CartItem = { sku: product.sku, name: product.name, emoji: product.emoji, confidence, weightDelta, price, discounted, ts: new Date().toISOString() };
+        const { accepted, reason } = fuseScan(product, confidence, weightDelta);
         // rejected scans are reported but never reach the cart or the bill
         if (accepted) {
           t.cartItems.push(item);
           t.totalWeight += weightDelta;
           t.cartTotal = +(t.cartTotal + price).toFixed(2);
         }
-        broadcast({ type: 'SCAN_EVENT', trolleyId: t.id, userId: t.userId, event: { ...item, accepted } });
+        broadcast({ type: 'SCAN_EVENT', trolleyId: t.id, userId: t.userId, event: { ...item, accepted, reason } });
 
         // auto-checkout at 15 items, calls the mock blockchain checkout
         if (t.cartItems.length >= 15) {
