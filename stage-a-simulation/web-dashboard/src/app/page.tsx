@@ -16,7 +16,8 @@ export type Trolley = {
   x: number;
   y: number;
   status: 'IDLE' | 'SHOPPING' | 'CHECKOUT';
-  cartItems: CartItem[];
+  cartItems: CartItem[]; // last 3 only, see itemCount for the full size
+  itemCount: number;
   totalWeight: number;
   cartTotal: number;
 };
@@ -24,6 +25,7 @@ export type Trolley = {
 export type CartItem = {
   sku: string;
   name: string;
+  emoji: string;
   confidence: number;
   weightDelta: number;
   price: number;
@@ -34,7 +36,7 @@ export type CartItem = {
 export type ScanEvent = {
   trolleyId: string;
   userId: string;
-  event: CartItem & { accepted: boolean };
+  event: CartItem & { accepted: boolean; reason?: string };
   ts: string;
 };
 
@@ -46,6 +48,7 @@ export type CheckoutEvent = {
   ok: boolean;
   hash?: string;
   reason?: string;
+  overdraftUsed?: number;
   ts: string;
 };
 
