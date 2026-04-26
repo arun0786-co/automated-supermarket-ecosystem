@@ -71,33 +71,41 @@ export default function Dashboard() {
     'USR-003': { balance: 210.75, lastHash: '0x0000000' },
   });
 
-  const fetchWallets = useCallback(async () => {
-    try {
-      const res = await fetch(`${SIM_HTTP}/api/wallets`);
-      const data = await res.json();
-      setWallets((prev) => {
-        const next = { ...prev };
-        data.forEach((w: { userId: string; balance: number }) => {
-          next[w.userId] = { ...(prev[w.userId] || {}), balance: w.balance, lastHash: prev[w.userId]?.lastHash ?? '0x000' };
+  // re-sync balances from the server, the source of truth for the mock ledger
+  const fetchWallets = useCallback(() => {
+    fetch(`${SIM_HTTP}/api/wallets`)
+      .then((res) => res.json())
+      .then((data: { userId: string; balance: number }[]) => {
+        setWallets((prev) => {
+          const next = { ...prev };
+          data.forEach((w) => {
+            next[w.userId] = { balance: w.balance, lastHash: prev[w.userId]?.lastHash ?? '0x000' };
+          });
+          return next;
         });
-        return next;
-      });
-    } catch { /* not connected yet */ }
+      })
+      .catch(() => { /* simulator not up yet, the websocket retry will catch it */ });
   }, []);
 
   useEffect(() => {
-    fetchWallets();
+    // set on unmount so the onclose handler doesn't schedule a reconnect
+    let stopped = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
     const connect = () => {
-      ws.current = new WebSocket(SIM_WS);
+      const socket = new WebSocket(SIM_WS);
+      ws.current = socket;
 
-      ws.current.onopen = () => setConnected(true);
-      ws.current.onclose = () => {
+      socket.onopen = () => {
+        setConnected(true);
+        fetchWallets();
+      };
+      socket.onclose = () => {
         setConnected(false);
-        setTimeout(connect, 3000);
+        if (!stopped) retry = setTimeout(connect, 3000);
       };
 
-      ws.current.onmessage = (evt) => {
+      socket.onmessage = (evt) => {
         const msg = JSON.parse(evt.data);
 
         if (msg.type === 'TROLLEY_POSITIONS') {
@@ -118,20 +126,21 @@ export default function Dashboard() {
           if (msg.ok && msg.hash) {
             setWallets((prev) => ({
               ...prev,
-              [msg.userId]: {
-                balance: prev[msg.userId]?.balance - msg.total,
-                lastHash: msg.hash,
-              },
+              [msg.userId]: { balance: prev[msg.userId]?.balance ?? 0, lastHash: msg.hash },
             }));
           }
-          // re-sync wallet from server after checkout
+          // the server has already debited the wallet, so fetch the real balance
           fetchWallets();
         }
       };
     };
 
     connect();
-    return () => ws.current?.close();
+    return () => {
+      stopped = true;
+      clearTimeout(retry);
+      ws.current?.close();
+    };
   }, [fetchWallets]);
 
   const walletList = [
