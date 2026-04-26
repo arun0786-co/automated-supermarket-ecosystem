@@ -8,6 +8,7 @@ import MetricsBar from '@/components/MetricsBar';
 import Sidebar from '@/components/Sidebar';
 import RecommendationFeed from '@/components/RecommendationFeed';
 import LedgerFeed from '@/components/LedgerFeed';
+import { SIM_HTTP, SIM_WS } from '@/lib/config';
 
 export type Trolley = {
   id: string;
@@ -72,7 +73,7 @@ export default function Dashboard() {
 
   const fetchWallets = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/wallets');
+      const res = await fetch(`${SIM_HTTP}/api/wallets`);
       const data = await res.json();
       setWallets((prev) => {
         const next = { ...prev };
@@ -88,7 +89,7 @@ export default function Dashboard() {
     fetchWallets();
 
     const connect = () => {
-      ws.current = new WebSocket('ws://localhost:3001');
+      ws.current = new WebSocket(SIM_WS);
 
       ws.current.onopen = () => setConnected(true);
       ws.current.onclose = () => {
