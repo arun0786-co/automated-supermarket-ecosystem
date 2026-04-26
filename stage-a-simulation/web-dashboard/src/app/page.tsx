@@ -49,11 +49,11 @@ export type CheckoutEvent = {
   ts: string;
 };
 
-export type WalletState = {
-  [userId: string]: {
-    balance: number;
-    lastHash: string;
-  };
+export type Wallet = {
+  userId: string;
+  name: string;
+  balance: number;
+  lastHash: string;
 };
 
 export default function Dashboard() {
@@ -64,25 +64,22 @@ export default function Dashboard() {
   const [connected, setConnected] = useState(false);
   const [txCount, setTxCount] = useState(0);
 
-  // wallet balances — updated on checkout events
-  const [wallets, setWallets] = useState<WalletState>({
-    'USR-001': { balance: 105.50, lastHash: '0x0000000' },
-    'USR-002': { balance: 62.00,  lastHash: '0x0000000' },
-    'USR-003': { balance: 210.75, lastHash: '0x0000000' },
-  });
+  // wallet list and balances come from the simulator, last block hash from checkout events
+  const [wallets, setWallets] = useState<Wallet[]>([]);
 
   // re-sync balances from the server, the source of truth for the mock ledger
   const fetchWallets = useCallback(() => {
     fetch(`${SIM_HTTP}/api/wallets`)
       .then((res) => res.json())
-      .then((data: { userId: string; balance: number }[]) => {
-        setWallets((prev) => {
-          const next = { ...prev };
-          data.forEach((w) => {
-            next[w.userId] = { balance: w.balance, lastHash: prev[w.userId]?.lastHash ?? '0x000' };
-          });
-          return next;
-        });
+      .then((data: { userId: string; name: string; balance: number }[]) => {
+        setWallets((prev) =>
+          data.map((w) => ({
+            userId: w.userId,
+            name: w.name,
+            balance: w.balance,
+            lastHash: prev.find((p) => p.userId === w.userId)?.lastHash ?? '-',
+          }))
+        );
       })
       .catch(() => { /* simulator not up yet, the websocket retry will catch it */ });
   }, []);
@@ -124,10 +121,9 @@ export default function Dashboard() {
           setCheckouts((prev) => [ev, ...prev].slice(0, 20));
 
           if (msg.ok && msg.hash) {
-            setWallets((prev) => ({
-              ...prev,
-              [msg.userId]: { balance: prev[msg.userId]?.balance ?? 0, lastHash: msg.hash },
-            }));
+            setWallets((prev) =>
+              prev.map((w) => (w.userId === msg.userId ? { ...w, lastHash: msg.hash } : w))
+            );
           }
           // the server has already debited the wallet, so fetch the real balance
           fetchWallets();
@@ -142,12 +138,6 @@ export default function Dashboard() {
       ws.current?.close();
     };
   }, [fetchWallets]);
-
-  const walletList = [
-    { userId: 'USR-001', name: 'Arun K.' },
-    { userId: 'USR-002', name: 'Priya M.' },
-    { userId: 'USR-003', name: 'Rohan S.' },
-  ];
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -184,14 +174,8 @@ export default function Dashboard() {
         {/* wallets + ledger */}
         <div className="grid grid-cols-12 gap-5">
           <div className="col-span-12 lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {walletList.map((w) => (
-              <WalletCard
-                key={w.userId}
-                userId={w.userId}
-                name={w.name}
-                balance={wallets[w.userId]?.balance ?? 0}
-                lastHash={wallets[w.userId]?.lastHash ?? '0x000'}
-              />
+            {wallets.map((w) => (
+              <WalletCard key={w.userId} userId={w.userId} name={w.name} balance={w.balance} lastHash={w.lastHash} />
             ))}
           </div>
           <div className="col-span-12 lg:col-span-4">
