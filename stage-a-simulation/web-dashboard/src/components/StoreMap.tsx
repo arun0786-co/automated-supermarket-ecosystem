@@ -8,17 +8,18 @@ type Props = { trolleys: Trolley[] };
 // rough floor plan — i drew this by hand to match a typical small supermarket
 // in stage C this will come from the SLAM map the trolley builds on first deployment
 // for now it's enough to give the dashboard something useful to look at
+// coords are in the simulator's 800x600 floor units so trolley x/y can be drawn directly
 const SHELVES = [
-  { x: 60,  y: 80,  w: 80, h: 20, label: 'Bakery' },
-  { x: 180, y: 80,  w: 80, h: 20, label: 'Dairy' },
-  { x: 300, y: 80,  w: 80, h: 20, label: 'Produce' },
-  { x: 420, y: 80,  w: 80, h: 20, label: 'Beverages' },
-  { x: 60,  y: 160, w: 20, h: 120, label: '' },
-  { x: 160, y: 160, w: 20, h: 120, label: '' },
-  { x: 260, y: 160, w: 20, h: 120, label: '' },
-  { x: 360, y: 160, w: 20, h: 120, label: '' },
-  { x: 460, y: 160, w: 20, h: 120, label: '' },
-  { x: 60,  y: 320, w: 450, h: 15, label: 'Checkout Lane' },
+  { x: 80,  y: 110, w: 120, h: 30,  label: 'Bakery' },
+  { x: 250, y: 110, w: 120, h: 30,  label: 'Dairy' },
+  { x: 420, y: 110, w: 120, h: 30,  label: 'Produce' },
+  { x: 590, y: 110, w: 120, h: 30,  label: 'Beverages' },
+  { x: 80,  y: 220, w: 30,  h: 180, label: '' },
+  { x: 230, y: 220, w: 30,  h: 180, label: '' },
+  { x: 380, y: 220, w: 30,  h: 180, label: '' },
+  { x: 530, y: 220, w: 30,  h: 180, label: '' },
+  { x: 680, y: 220, w: 30,  h: 180, label: '' },
+  { x: 80,  y: 480, w: 630, h: 22,  label: 'Checkout Lane' },
 ];
 
 // give each trolley a distinct colour so they're easy to tell apart on the map
@@ -62,7 +63,7 @@ export default function StoreMap({ trolleys }: Props) {
 
       if (s.label) {
         ctx.fillStyle = 'rgba(148,163,184,0.7)';
-        ctx.font = '9px system-ui';
+        ctx.font = '13px system-ui';
         ctx.textAlign = 'center';
         ctx.fillText(s.label, s.x + s.w / 2, s.y + s.h / 2 + 3);
       }
@@ -119,8 +120,8 @@ export default function StoreMap({ trolleys }: Props) {
       <div className="p-4">
         <canvas
           ref={canvasRef}
-          width={560}
-          height={380}
+          width={800}
+          height={600}
           className="w-full rounded-xl bg-slate-950/50"
         />
       </div>
