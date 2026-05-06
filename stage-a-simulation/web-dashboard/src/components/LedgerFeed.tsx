@@ -34,6 +34,7 @@ export default function LedgerFeed({ checkouts }: Props) {
               </p>
               <p className="text-[10px] text-slate-500">
                 {c.trolleyId} · {c.itemCount} items · {c.userId}
+                {c.overdraftUsed ? <span className="text-amber-400"> · overdraft {c.overdraftUsed.toFixed(2)}</span> : null}
               </p>
             </div>
           ))
