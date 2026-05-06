@@ -4,24 +4,34 @@ import { Sparkles } from 'lucide-react';
 import type { ScanEvent } from '@/app/page';
 import { useMemo } from 'react';
 
-// maps the last scanned product name to contextual suggestions (simulates Service D collaborative filtering)
-const RECS: Record<string, { item: string; reason: string; emoji: string }[]> = {
-  'Cereal Box':  [{ item: 'Whole Milk 1L',    reason: 'Goes well with cereal',        emoji: '🥛' }, { item: 'Bananas',        reason: 'Quick breakfast pairing',         emoji: '🍌' }],
-  'Banana':      [{ item: 'Greek Yogurt',      reason: 'Popular combo',                emoji: '🫙' }, { item: 'Granola 500g',   reason: 'Users who bought bananas…',       emoji: '🥣' }],
-  'Almond Milk': [{ item: 'Oat Cookies',       reason: 'Dairy-free match',             emoji: '🍪' }, { item: 'Protein Bar',    reason: 'Popular in health aisle',        emoji: '🍫' }],
-  'Pasta 500g':  [{ item: 'Olive Oil 500ml',   reason: 'Essential pairing',            emoji: '🫙' }, { item: 'Basil',          reason: 'You have pasta + oil in cart',    emoji: '🌿' }],
-  'Chicken Breast': [{ item: 'Olive Oil 500ml', reason: 'Cooking essential',           emoji: '🫙' }, { item: 'Garlic',         reason: 'Top pairing in your aisle',      emoji: '🧄' }],
-  'default':     [{ item: 'Sparkling Water',   reason: 'Top seller today',             emoji: '💧' }, { item: 'Dark Chocolate', reason: 'Trending in your area',           emoji: '🍫' }],
+// last accepted sku -> suggestions, all real catalog items. the pairs mirror the
+// co-purchase matrix in stage-b-mvp/services/ai-engine (service D)
+type Rec = { item: string; reason: string; emoji: string };
+const RECS: Record<string, Rec[]> = {
+  'PRD-001': [{ item: 'Greek Yogurt',    reason: 'Commonly bought together', emoji: '🫙' }, { item: 'Cereal Box',      reason: 'Popular breakfast combo',  emoji: '🥣' }],
+  'PRD-004': [{ item: 'Olive Oil 500ml', reason: 'Avocado toast essential',  emoji: '🫙' }, { item: 'Sourdough Loaf',  reason: 'Avocado toast essential',  emoji: '🍞' }],
+  'DRY-001': [{ item: 'Cereal Box',      reason: 'Milk goes with cereal',    emoji: '🥣' }, { item: 'White Bread',     reason: 'Classic combo',            emoji: '🍞' }],
+  'DRY-002': [{ item: 'Granola 500g',    reason: 'Almond milk + granola',    emoji: '🥣' }, { item: 'Green Tea 25s',   reason: 'Health aisle pairing',     emoji: '🍵' }],
+  'BKR-001': [{ item: 'Full Cream Milk', reason: 'Bread and milk',           emoji: '🥛' }, { item: 'Peanut Butter',   reason: 'Peanut butter toast',      emoji: '🫙' }],
+  'PNT-001': [{ item: 'Full Cream Milk', reason: 'Cereal and milk',          emoji: '🥛' }, { item: 'Banana',          reason: 'Fruit with cereal',        emoji: '🍌' }],
+  'PNT-002': [{ item: 'Olive Oil 500ml', reason: 'Pasta and olive oil',      emoji: '🫙' }, { item: 'Chicken Breast',  reason: 'Chicken pasta',            emoji: '🍗' }],
+  'BVG-003': [{ item: 'Croissant x2',    reason: 'Morning coffee set',       emoji: '🥐' }, { item: 'Dark Chocolate',  reason: 'Coffee and chocolate',     emoji: '🍫' }],
+  'MTF-001': [{ item: 'Olive Oil 500ml', reason: 'Cooking essential',        emoji: '🫙' }, { item: 'Tomato',          reason: 'Chicken and tomato',       emoji: '🍅' }],
+  'MTF-002': [{ item: 'Olive Oil 500ml', reason: 'Salmon cooking essential', emoji: '🫙' }, { item: 'Orange',          reason: 'Salmon and citrus',        emoji: '🍊' }],
 };
+// trending fallback when there's no scan yet or no pairing for the sku
+const TRENDING: Rec[] = [
+  { item: 'Sparkling Water', reason: 'Top seller this week',  emoji: '💧' },
+  { item: 'Dark Chocolate',  reason: 'Trending in your area', emoji: '🍫' },
+];
 
 type Props = { scanEvents: ScanEvent[] };
 
 export default function RecommendationFeed({ scanEvents }: Props) {
   const recs = useMemo(() => {
-    if (scanEvents.length === 0) return RECS['default'];
-    // use the product name from the CartItem (replaces old 'class' field)
-    const latestName = scanEvents[0].event.name;
-    return RECS[latestName] || RECS['default'];
+    // rejected scans never reached the cart, so don't recommend off them
+    const latest = scanEvents.find((e) => e.event.accepted);
+    return (latest && RECS[latest.event.sku]) || TRENDING;
   }, [scanEvents]);
 
   return (
