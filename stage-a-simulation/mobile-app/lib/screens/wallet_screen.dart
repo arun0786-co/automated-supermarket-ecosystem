@@ -70,9 +70,9 @@ class WalletScreen extends StatelessWidget {
             const Text('About \$SPMT', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
 
-            _InfoTile(icon: Icons.link, title: 'Pegged 1:1', subtitle: 'Each \$SPMT equals 1 unit of local fiat currency'),
-            _InfoTile(icon: Icons.speed, title: 'Instant Settlement', subtitle: 'IBFT 2.0 consensus — no waiting for block confirmations'),
-            _InfoTile(icon: Icons.credit_score, title: 'Trusted Overdraft', subtitle: 'Subscribers can go up to −\$20 SPMT for trusted checkout'),
+            const _InfoTile(icon: Icons.link, title: 'Pegged 1:1', subtitle: 'Each \$SPMT equals 1 unit of local fiat currency'),
+            const _InfoTile(icon: Icons.speed, title: 'Instant Settlement', subtitle: 'IBFT 2.0 consensus — no waiting for block confirmations'),
+            const _InfoTile(icon: Icons.credit_score, title: 'Trusted Overdraft', subtitle: 'Subscribers can go up to −\$20 SPMT for trusted checkout'),
           ],
         ),
       ),
