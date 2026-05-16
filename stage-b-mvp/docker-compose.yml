@@ -1,0 +1,89 @@
+version: "3.9"
+# Stage B Docker Compose — run with: docker compose up
+# Each service listed here maps to a chapter in the ASE-PRIME spec PDF.
+# Only scaffold for now — fill in actual Dockerfiles as Stage B is built out.
+
+services:
+
+  # ── Service A: Product Core (Chapter 4) ─────────────────────
+  product-core:
+    build: ./services/product-core
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_HOST=postgres
+      - DB_PASS=${POSTGRES_PASSWORD}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+
+  # ── Service C: Fintech Vault / Blockchain (Chapter 6) ───────
+  fintech-vault:
+    build: ./services/fintech-vault
+    ports:
+      - "3002:3002"
+    environment:
+      - CHAIN_RPC=http://hardhat-node:8545
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - hardhat-node
+
+  # ── Service D: AI Recommendations (Chapter 7) ───────────────
+  ai-engine:
+    build: ./services/ai-engine
+    ports:
+      - "8000:8000"
+    environment:
+      - PRODUCT_CORE_URL=http://product-core:3001
+
+  # ── Databases ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ase
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ase_products
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1
+    ports:
+      - "6379:6379"
+
+  # ── Local Blockchain (replaces Hyperledger Besu in dev) ─────
+  hardhat-node:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install -g hardhat && npx hardhat node --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+
+  # ── MQTT Broker (replaces WebSocket in Stage B) ─────────────
+  mqtt-broker:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  # ── API Gateway ─────────────────────────────────────────────
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - product-core
+      - fintech-vault
+      - ai-engine
+
+volumes:
+  postgres_data:
