@@ -1,0 +1,22 @@
+{
+  "name": "fintech-vault",
+  "version": "1.0.0",
+  "description": "service C — blockchain wallet, SPMT token, checkout contracts",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.1",
+    "ethers": "^6.10.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@types/node": "^20.11.5",
+    "hardhat": "^2.20.1",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}
