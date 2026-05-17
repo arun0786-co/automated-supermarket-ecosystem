@@ -60,7 +60,7 @@ class CartScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            Text('${(item['price'] as num).toStringAsFixed(2)} ₹',
+                            Text('${(item['price'] as num).toStringAsFixed(2)} SPMT',
                               style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.bold)),
                           ],
                         ),
