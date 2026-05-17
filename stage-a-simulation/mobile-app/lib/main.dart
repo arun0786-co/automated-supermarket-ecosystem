@@ -6,6 +6,7 @@ import 'state/wallet_state.dart';
 import 'screens/home_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/wallet_screen.dart';
+import 'widgets/app_shell.dart';
 
 void main() {
   runApp(
@@ -21,9 +22,14 @@ void main() {
 
 final _router = GoRouter(
   routes: [
-    GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
-    GoRoute(path: '/cart', builder: (_, __) => const CartScreen()),
-    GoRoute(path: '/wallet', builder: (_, __) => const WalletScreen()),
+    ShellRoute(
+      builder: (_, __, child) => AppShell(child: child),
+      routes: [
+        GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
+        GoRoute(path: '/cart', builder: (_, __) => const CartScreen()),
+        GoRoute(path: '/wallet', builder: (_, __) => const WalletScreen()),
+      ],
+    ),
   ],
 );
 

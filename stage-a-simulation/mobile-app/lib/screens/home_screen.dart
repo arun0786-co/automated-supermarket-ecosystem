@@ -117,14 +117,6 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.shopping_cart_outlined), label: 'Cart'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: 'Wallet'),
-        ],
-      ),
     );
   }
 }
