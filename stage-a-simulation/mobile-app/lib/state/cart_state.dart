@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../config.dart';
 
 // CartState manages the live cart data for the mobile app.
 // it connects to the same WebSocket as the web dashboard and
@@ -21,7 +22,7 @@ class CartState extends ChangeNotifier {
 
   void _connect() {
     try {
-      _channel = WebSocketChannel.connect(Uri.parse('ws://localhost:3001'));
+      _channel = WebSocketChannel.connect(Uri.parse(simWs));
       connected = true;
       notifyListeners();
 
