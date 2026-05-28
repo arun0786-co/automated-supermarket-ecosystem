@@ -60,7 +60,7 @@ class WalletScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   if (isNegative)
-                    const Text('Overdraft active — subscriber benefit',
+                    const Text('Overdraft active, subscriber benefit',
                       style: TextStyle(color: Color(0xFFF87171), fontSize: 12)),
                 ],
               ),
@@ -72,7 +72,13 @@ class WalletScreen extends StatelessWidget {
 
             const _InfoTile(icon: Icons.link, title: 'Pegged 1:1', subtitle: 'Each \$SPMT equals 1 unit of local fiat currency'),
             const _InfoTile(icon: Icons.speed, title: 'Instant Settlement', subtitle: 'IBFT 2.0 consensus — no waiting for block confirmations'),
-            const _InfoTile(icon: Icons.credit_score, title: 'Trusted Overdraft', subtitle: 'Subscribers can go up to −\$20 SPMT for trusted checkout'),
+            _InfoTile(
+              icon: Icons.credit_score,
+              title: 'Trusted Overdraft',
+              subtitle: wallet.isSubscriber
+                  ? 'You can go down to ${wallet.overdraftLimit.toStringAsFixed(0)} SPMT at checkout'
+                  : 'Subscribers can go below zero at checkout, up to their limit',
+            ),
           ],
         ),
       ),
