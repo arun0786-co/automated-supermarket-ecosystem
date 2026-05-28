@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../state/cart_state.dart';
 import '../state/wallet_state.dart';
 
-// home screen — connects to WebSocket and shows the live cart + recommendations
+// home screen, connects to WebSocket and shows the live cart + recommendations
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -76,7 +76,7 @@ class HomeScreen extends StatelessWidget {
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(40),
-                  child: Text('Start shopping — items appear automatically!',
+                  child: Text('Start shopping. Items appear automatically.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
                 ),
