@@ -1,4 +1,4 @@
-// product catalog — keeping this as a flat array for now since we don't have a DB yet
+// product catalog, keeping this as a flat array for now since we don't have a DB yet
 // when stage B is up and running, this moves into postgres and gets loaded via prisma
 // weights are the "standard" values, the trolley sensor adds ±5g noise on top
 // daysToExpiry of 0 means the item doesn't expire (tinned goods, dry stuff etc.)

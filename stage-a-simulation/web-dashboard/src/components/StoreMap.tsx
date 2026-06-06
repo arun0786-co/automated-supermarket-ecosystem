@@ -5,7 +5,7 @@ import type { Trolley } from '@/app/page';
 
 type Props = { trolleys: Trolley[] };
 
-// rough floor plan — i drew this by hand to match a typical small supermarket
+// rough floor plan, i drew this by hand to match a typical small supermarket
 // in stage C this will come from the SLAM map the trolley builds on first deployment
 // for now it's enough to give the dashboard something useful to look at
 // coords are in the simulator's 800x600 floor units so trolley x/y can be drawn directly
