@@ -34,7 +34,7 @@ export class Product {
   @Column('int', { default: 100 })
   stockLevel: number;
 
-  // low stock threshold — if stockLevel drops below this AND daysToExpiry < 2, apply discount
+  // discount threshold: if stockLevel is above this AND daysToExpiry < 2, apply discount
   @Column('int', { default: 10 })
   discountThreshold: number;
 
