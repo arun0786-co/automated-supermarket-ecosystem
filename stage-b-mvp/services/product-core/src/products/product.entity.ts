@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, VersionColumn } from 'typeorm';
 
 // mirrors the Product type from stage A but now persisted in postgres
 // added stock_level because stage A was just faking that part
@@ -40,4 +40,8 @@ export class Product {
 
   @Column({ default: true })
   active: boolean;
+
+  // bumped on every stock change, used for optimistic concurrency (chapter 4.3.1)
+  @VersionColumn()
+  version: number;
 }
