@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './product.entity';
@@ -47,8 +47,20 @@ export class ProductsService {
     return this.repo.save(this.repo.create(data));
   }
 
-  // decrement stock when a scan event comes in from the trolley
-  async decrementStock(sku: string, quantity = 1): Promise<void> {
-    await this.repo.decrement({ sku }, 'stockLevel', quantity);
+  // take items off the shelf with optimistic concurrency (chapter 4.3.1 of the spec):
+  // read version v, update WHERE version = v, and if someone else got there first
+  // re-read and try again. returns the new stock level
+  async pick(sku: string, quantity = 1, maxAttempts = 5): Promise<number> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const p = await this.findBySku(sku);
+      if (p.stockLevel < quantity) throw new ConflictException(`only ${p.stockLevel} of ${sku} left`);
+
+      const result = await this.repo.update(
+        { sku, version: p.version },
+        { stockLevel: p.stockLevel - quantity, version: p.version + 1 },
+      );
+      if (result.affected === 1) return p.stockLevel - quantity;
+    }
+    throw new ConflictException(`stock for ${sku} kept changing, try again`);
   }
 }
