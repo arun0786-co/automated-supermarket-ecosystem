@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
-import { provider } from '../server';
+import { provider } from '../chain';
 import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
 
 const router = Router();
