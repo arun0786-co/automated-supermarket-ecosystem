@@ -24,3 +24,6 @@ stage-a-simulation/mobile-app/build/
 .env.*
 .DS_Store
 *.log
+
+# hardhat deploy output
+stage-b-mvp/services/fintech-vault/deployments/
