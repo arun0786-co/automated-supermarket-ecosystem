@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
 import { signer, tokenAddress } from '../chain';
+import { isAddress, parseAmount } from '../validate';
 import SPMTTokenABI from '../../artifacts/contracts/SPMTToken.sol/SPMTToken.json';
 
 const router = Router();
@@ -11,6 +12,7 @@ function getToken() {
 
 // GET /api/wallet/:address — returns SPMT balance for an address
 router.get('/:address', async (req: Request, res: Response) => {
+  if (!isAddress(req.params.address)) return res.status(400).json({ error: 'invalid address' });
   try {
     const token = getToken();
     const balance = await token.balanceOf(req.params.address);
@@ -32,10 +34,11 @@ router.get('/:address', async (req: Request, res: Response) => {
 // POST /api/wallet/mint — admin only, adds SPMT when customer tops up via fiat
 router.post('/mint', async (req: Request, res: Response) => {
   const { to, amount } = req.body;
-  if (!to || !amount) return res.status(400).json({ error: 'to and amount required' });
+  const wei = parseAmount(amount);
+  if (!isAddress(to) || wei === null) return res.status(400).json({ error: 'to address and a positive amount required' });
   try {
     const token = getToken();
-    const tx = await token.mint(to, ethers.parseUnits(String(amount), 18));
+    const tx = await token.mint(to, wei);
     await tx.wait();
     res.json({ ok: true, hash: tx.hash });
   } catch (err: any) {
