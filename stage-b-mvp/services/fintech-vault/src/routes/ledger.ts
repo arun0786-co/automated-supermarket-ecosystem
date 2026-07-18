@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
-import { provider, checkoutAddress } from '../chain';
+import { provider, checkoutAddress, latestBlock } from '../chain';
 import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
 
 const router = Router();
@@ -10,7 +10,7 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const blockNumber = await provider.getBlockNumber();
+    const blockNumber = await latestBlock();
 
     // scan the last 500 blocks for purchase events
     // in production this would use an indexer like The Graph instead of scanning
