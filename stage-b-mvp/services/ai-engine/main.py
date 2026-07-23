@@ -2,8 +2,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
+import os
 import httpx
-import math
 from collections import defaultdict
 
 # service D — AI recommendation engine
@@ -20,7 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PRODUCT_CORE_URL = "http://product-core:3001"
+# docker compose sets this, the default matches the compose service name
+PRODUCT_CORE_URL = os.environ.get("PRODUCT_CORE_URL", "http://product-core:3001")
 
 # request schema — frontend sends what's currently in the cart
 class CartItem(BaseModel):
