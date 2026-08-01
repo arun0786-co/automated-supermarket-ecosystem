@@ -94,6 +94,8 @@ async def get_recommendations(req: RecommendationRequest):
     # aggregate scores from co-purchase matrix for all items in the cart
     candidate_scores: dict[str, float] = defaultdict(float)
     candidate_reasons: dict[str, str] = {}
+    # strongest single pairing per candidate, so the reason shown is the best one
+    best_pair_score: dict[str, float] = {}
     cart_skus = {item.sku for item in req.cartItems}
 
     for item in req.cartItems:
@@ -102,8 +104,8 @@ async def get_recommendations(req: RecommendationRequest):
             # don't recommend things already in the cart
             if related_sku not in cart_skus:
                 candidate_scores[related_sku] += score
-                # keep the highest-scoring reason
-                if related_sku not in candidate_reasons or score > candidate_scores[related_sku]:
+                if score > best_pair_score.get(related_sku, 0):
+                    best_pair_score[related_sku] = score
                     candidate_reasons[related_sku] = reason
 
     # sort by score descending
