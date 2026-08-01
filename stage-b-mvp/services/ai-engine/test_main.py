@@ -18,10 +18,10 @@ CATALOG = {
 @pytest.fixture
 def client(monkeypatch):
     # stand-in for product-core so tests don't need the service running
-    async def fake_fetch(sku):
-        return CATALOG.get(sku)
+    async def fake_catalog():
+        return {sku: {"sku": sku, **p} for sku, p in CATALOG.items()}
 
-    monkeypatch.setattr(main, "fetch_product", fake_fetch)
+    monkeypatch.setattr(main, "fetch_catalog", fake_catalog)
     return TestClient(main.app)
 
 
@@ -60,3 +60,8 @@ def test_reason_comes_from_the_strongest_pairing(client):
     res = client.post("/api/recommendations", json={"userId": "USR-001", "cartItems": [item("PRD-002"), item("PRD-001")]})
     yogurt = next(r for r in res.json() if r["sku"] == "DRY-003")
     assert yogurt["reason"] == "commonly bought together"
+
+
+def test_trending_endpoint(client):
+    res = client.get("/api/recommendations/trending")
+    assert [r["sku"] for r in res.json()] == ["BVG-001", "SNK-001", "DRY-003", "PRD-004"]
