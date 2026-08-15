@@ -13,8 +13,10 @@ services:
       - DB_PASS=${POSTGRES_PASSWORD}
       - REDIS_URL=redis://redis:6379
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   # ── Service C: Fintech Vault / Blockchain (Chapter 6) ───────
   fintech-vault:
@@ -25,7 +27,8 @@ services:
       - CHAIN_RPC=http://hardhat-node:8545
       - JWT_SECRET=${JWT_SECRET}
     depends_on:
-      - hardhat-node
+      hardhat-node:
+        condition: service_healthy
 
   # ── Service D: AI Recommendations (Chapter 7) ───────────────
   ai-engine:
@@ -34,6 +37,8 @@ services:
       - "8000:8000"
     environment:
       - PRODUCT_CORE_URL=http://product-core:3001
+    depends_on:
+      - product-core
 
   # ── Databases ───────────────────────────────────────────────
   postgres:
@@ -44,6 +49,10 @@ services:
       POSTGRES_DB: ase_products
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "ase", "-d", "ase_products"]
+      interval: 2s
+      retries: 30
     ports:
       - "5432:5432"
 
@@ -60,6 +69,10 @@ services:
     command: ["npx", "hardhat", "node", "--hostname", "0.0.0.0"]
     ports:
       - "8545:8545"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8545',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_blockNumber'})}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 2s
+      retries: 30
 
   # ── MQTT Broker (replaces WebSocket in Stage B) ─────────────
   mqtt-broker:
