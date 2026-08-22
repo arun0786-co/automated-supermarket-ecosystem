@@ -47,15 +47,14 @@ async function seed() {
   await ds.initialize();
   console.log('db connected, seeding...');
   const repo = ds.getRepository(Product);
+  // insert missing products only, so re-running on startup never resets live stock levels
+  let added = 0;
   for (const item of SEED_DATA) {
-    const existing = await repo.findOne({ where: { sku: item.sku } });
-    if (existing) {
-      await repo.save({ ...existing, ...item });
-    } else {
-      await repo.save(repo.create(item));
-    }
+    if (await repo.findOne({ where: { sku: item.sku } })) continue;
+    await repo.save(repo.create(item));
+    added++;
   }
-  console.log(`seeded ${SEED_DATA.length} products`);
+  console.log(`seeded ${added} new products (${SEED_DATA.length - added} already there)`);
   await ds.destroy();
 }
 
