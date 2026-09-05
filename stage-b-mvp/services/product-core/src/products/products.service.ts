@@ -11,7 +11,7 @@ export class ProductsService {
   ) {}
 
   findAll(): Promise<Product[]> {
-    // only return active products — soft-delete by setting active=false
+    // only return active products, soft-delete by setting active=false
     return this.repo.find({ where: { active: true } });
   }
 

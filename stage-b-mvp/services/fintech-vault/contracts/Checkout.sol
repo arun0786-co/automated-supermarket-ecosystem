@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "./SPMTToken.sol";
 
-// checkout contract — called by the backend API after verifying the cart total
+// checkout contract, called by the backend API after verifying the cart total
 // keeps the payment logic on-chain so the store can't tamper with it after deployment
 // in production this would be called via a relayer (meta-transactions) so customers
 // don't need ETH for gas
@@ -11,7 +11,7 @@ contract Checkout {
     SPMTToken public token;
     address public owner;
 
-    // one event per successful purchase — indexed by customer for easy filtering
+    // one event per successful purchase, indexed by customer for easy filtering
     event Purchase(
         address indexed customer,
         uint256 amount,
@@ -31,7 +31,7 @@ contract Checkout {
         _;
     }
 
-    // cartHash is keccak256(abi.encodePacked(itemSkus, quantities)) — computed off-chain by backend
+    // cartHash is keccak256(abi.encodePacked(itemSkus, quantities)), computed off-chain by backend
     // storing it on-chain gives us an immutable audit trail matching receipt to on-chain tx
     function processCheckout(
         address customer,

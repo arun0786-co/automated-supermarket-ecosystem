@@ -6,7 +6,7 @@ import os
 import httpx
 from collections import defaultdict
 
-# service D — AI recommendation engine
+# service D: AI recommendation engine
 # stage A was using a simple rule-based lookup table
 # this replaces it with item-based collaborative filtering using purchase history
 # stage C will upgrade this to a full matrix factorisation model (SVD or ALS)
@@ -23,7 +23,7 @@ app.add_middleware(
 # docker compose sets this, the default matches the compose service name
 PRODUCT_CORE_URL = os.environ.get("PRODUCT_CORE_URL", "http://product-core:3001")
 
-# request schema — frontend sends what's currently in the cart
+# request schema, frontend sends what's currently in the cart
 class CartItem(BaseModel):
     sku: str
     name: str
@@ -44,7 +44,7 @@ class Recommendation(BaseModel):
     reason: str
     score: float
 
-# hand-coded co-purchase matrix — just enough to make it look real for stage B
+# hand-coded co-purchase matrix, just enough to make it look real for stage B
 # in stage C this gets replaced by a proper SVD model trained on actual transaction data
 # format: { sku: [(related_sku, score, reason), ...] }
 CO_PURCHASE_MATRIX = {

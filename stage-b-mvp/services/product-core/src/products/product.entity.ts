@@ -19,7 +19,7 @@ export class Product {
   @Column('decimal', { precision: 8, scale: 2 })
   price: number;
 
-  // grams — what the load cell should read for this item (before ±5% sensor noise)
+  // grams, scans are accepted when the load cell reading is within ±10g of this
   @Column('int')
   weight: number;
 
@@ -30,7 +30,7 @@ export class Product {
   @Column('int', { default: 0 })
   daysToExpiry: number;
 
-  // actual inventory — not tracked in stage A, needed for proper dynamic pricing
+  // actual inventory, not tracked in stage A, needed for proper dynamic pricing
   @Column('int', { default: 100 })
   stockLevel: number;
 

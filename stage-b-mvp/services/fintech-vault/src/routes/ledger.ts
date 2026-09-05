@@ -6,7 +6,7 @@ import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
 const router = Router();
 
 // GET /api/ledger?limit=20&page=0
-// reads Purchase events directly from the chain — no off-chain DB needed
+// reads Purchase events directly from the chain, no off-chain DB needed
 router.get('/', async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
