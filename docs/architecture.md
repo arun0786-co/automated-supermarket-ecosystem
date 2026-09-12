@@ -16,13 +16,14 @@ sequenceDiagram
     participant Wallet as $SPMT Wallet
 
     Trolley->>Backend: Weight event (dWeight > 10g)
-    Backend->>Backend: Simulate YOLOv8 inference + Kalman fusion
-    Backend->>WS: Emit SCAN_EVENT {class, confidence, weight}
+    Backend->>Backend: Simulate YOLOv8 inference, fuse with weight (±10g of catalog)
+    Backend->>WS: Emit SCAN_EVENT {sku, confidence, weightDelta, accepted, reason}
     WS->>Dashboard: Push to all connected clients
-    Dashboard->>Dashboard: Update StoreMap canvas
-    Dashboard->>Dashboard: Append to ScanFeed list
-    Dashboard->>Dashboard: Re-run AI recommendation logic
-    Dashboard->>Wallet: Deduct $SPMT for matched item
+    Dashboard->>Dashboard: Append to ScanFeed, refresh recommendations
+    Note over Backend: accepted items only are added to the cart
+    Backend->>Wallet: Checkout at 15 items (limited overdraft contract)
+    Backend->>WS: Emit CHECKOUT_EVENT {total, ok, hash, overdraftUsed}
+    WS->>Dashboard: Update ledger, re-fetch wallet balances
 ```
 
 ---
@@ -37,11 +38,12 @@ classDiagram
         +y: number
         +status: IDLE | SHOPPING | CHECKOUT
         +cartItems: CartItem[]
-        +tick(): void
+        +itemCount: number
     }
 
     class CartItem {
-        +class: string
+        +sku: string
+        +name: string
         +confidence: float
         +weightDelta: number
     }
@@ -56,8 +58,9 @@ classDiagram
 | Event Type | Direction | Payload |
 |---|---|---|
 | `INFO` | Server → Client | Initial connection message |
-| `TROLLEY_POSITIONS` | Server → Client | Array of all trolley states (every 1s) |
-| `SCAN_EVENT` | Server → Client | Single item detection event |
+| `TROLLEY_POSITIONS` | Server → Client | Array of all trolley states (every 800ms) |
+| `SCAN_EVENT` | Server → Client | Single item detection, accepted or rejected |
+| `CHECKOUT_EVENT` | Server → Client | Checkout result once a cart reaches 15 items |
 
 ---
 
