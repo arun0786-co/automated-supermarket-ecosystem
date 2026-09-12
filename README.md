@@ -74,7 +74,7 @@ test suite, and `make help` lists the other shortcuts.
 
 `make stage-a` starts both servers. To run them separately, use two terminals.
 
-**Terminal 1 — Backend**
+**Terminal 1: Backend**
 ```bash
 cd stage-a-simulation/api-simulator
 npm start
@@ -82,7 +82,7 @@ npm start
 # ws://localhost:3001
 ```
 
-**Terminal 2 — Frontend**
+**Terminal 2: Frontend**
 ```bash
 cd stage-a-simulation/web-dashboard
 npm run dev
@@ -91,7 +91,7 @@ npm run dev
 
 Open `http://localhost:3000`. The dashboard auto-connects over WebSocket and starts showing
 live trolley positions, item scans with confidence scores, blockchain transactions, and AI
-recommendations — all updating in real time without a page reload.
+recommendations, all updating in real time without a page reload.
 
 **Quick API test with curl:**
 ```bash
@@ -123,7 +123,7 @@ fusion step from chapter 5 accepts the scan only if confidence is at least 0.60 
 weight is within 10g of the catalog weight. Accepted items go into the cart; either way a
 SCAN_EVENT fires over WebSocket to every connected client.
 
-When a cart hits 15 items it auto-checkouts — that calls the mock blockchain checkout function
+When a cart hits 15 items it auto-checkouts, which calls the mock blockchain checkout function
 which implements the Limited Overdraft contract from chapter 6 of the spec, generates a real
 SHA256 block hash, and fires a CHECKOUT_EVENT that the dashboard uses to update the ledger
 and debit the wallet card.
@@ -133,4 +133,4 @@ hardware, but all the data shapes stay exactly the same so the frontend shouldn'
 any changes.
 
 ---
-*actively being developed — stage A is complete, stage B is next*
+*actively being developed: stage A is complete, stage B is in progress*

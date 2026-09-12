@@ -1,4 +1,4 @@
-# Stage C — Production Hardware Integration
+# Stage C: Production Hardware Integration
 
 This directory will contain everything that actually runs on the physical smart trolleys,
 the edge gateway servers, and the cloud Kubernetes cluster. Stage B must be complete
