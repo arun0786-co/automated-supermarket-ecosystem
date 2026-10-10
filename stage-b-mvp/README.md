@@ -44,8 +44,13 @@ a message broker, and containerised deployments.
 
 ```bash
 # from the repo root, needs Docker
-ADMIN_TOKEN=pick-a-secret make stage-b
+cp stage-b-mvp/.env.example stage-b-mvp/.env   # then set POSTGRES_PASSWORD and ADMIN_TOKEN
+make stage-b
 ```
+
+No passwords live in the repo. Compose refuses to start without `POSTGRES_PASSWORD`, and
+mint stays disabled while `ADMIN_TOKEN` is empty. To run product-core outside Docker, set
+`DATABASE_URL` or `DB_PASS` (plus `DB_HOST`, `DB_USER`, `DB_NAME` if they differ from the defaults).
 
 Everything is reached through the nginx gateway on port 80:
 
