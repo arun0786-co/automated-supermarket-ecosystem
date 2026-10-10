@@ -40,6 +40,7 @@ stage-a:
 	@(cd stage-a-simulation/api-simulator && npm start) & (cd stage-a-simulation/web-dashboard && npm run dev)
 
 stage-b:
+	@test -f stage-b-mvp/.env || (echo "copy stage-b-mvp/.env.example to stage-b-mvp/.env and set POSTGRES_PASSWORD first" && exit 1)
 	cd stage-b-mvp && docker compose up --build
 
 stage-b-down:
