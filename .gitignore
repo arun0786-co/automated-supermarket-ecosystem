@@ -27,3 +27,6 @@ stage-a-simulation/mobile-app/build/
 
 # hardhat deploy output
 stage-b-mvp/services/fintech-vault/deployments/
+
+# example env files are templates, keep them
+!.env.example
