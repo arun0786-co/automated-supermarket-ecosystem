@@ -1,7 +1,5 @@
-version: "3.9"
-# Stage B Docker Compose — run with: docker compose up
+# Stage B Docker Compose, run with: docker compose up
 # Each service listed here maps to a chapter in the ASE-PRIME spec PDF.
-# Only scaffold for now — fill in actual Dockerfiles as Stage B is built out.
 
 services:
 
@@ -77,7 +75,6 @@ services:
     image: nginx:alpine
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./config/nginx.conf:/etc/nginx/nginx.conf
     depends_on:
