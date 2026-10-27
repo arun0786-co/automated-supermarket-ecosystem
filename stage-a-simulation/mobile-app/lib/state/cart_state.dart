@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -20,13 +19,21 @@ class CartState extends ChangeNotifier {
     _connect();
   }
 
-  void _connect() {
+  // set in dispose so a late onDone doesn't schedule another reconnect
+  bool _disposed = false;
+
+  Future<void> _connect() async {
+    if (_disposed) return;
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(simWs));
+      final channel = WebSocketChannel.connect(Uri.parse(simWs));
+      _channel = channel;
+      // only report connected once the handshake has actually finished
+      await channel.ready;
+      if (_disposed) return;
       connected = true;
       notifyListeners();
 
-      _channel!.stream.listen(
+      channel.stream.listen(
         (raw) {
           final msg = jsonDecode(raw as String) as Map<String, dynamic>;
 
@@ -46,25 +53,25 @@ class CartState extends ChangeNotifier {
             notifyListeners();
           }
         },
-        onDone: () {
-          connected = false;
-          notifyListeners();
-          // retry connection
-          Future.delayed(const Duration(seconds: 3), _connect);
-        },
-        onError: (_) {
-          connected = false;
-          notifyListeners();
-        },
+        onDone: _retry,
+        // onDone follows the error, which handles the retry
+        onError: (_) {},
       );
     } catch (_) {
-      connected = false;
-      notifyListeners();
+      _retry();
     }
+  }
+
+  void _retry() {
+    if (_disposed) return;
+    connected = false;
+    notifyListeners();
+    Future.delayed(const Duration(seconds: 3), _connect);
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _channel?.sink.close();
     super.dispose();
   }
