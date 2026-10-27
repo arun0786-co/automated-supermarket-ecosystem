@@ -51,6 +51,9 @@ export function getAllWallets(): WalletEntry[] {
 // subscribers can go negative down to their overdraftLimit
 // if they go below that, transaction gets rejected same as insufficient funds
 export function checkout(userId: string, amount: number): { ok: boolean; hash?: string; reason?: string } {
+  // a negative amount would credit the wallet, so only positive totals are allowed
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, reason: 'invalid amount' };
+
   const wallet = wallets.get(userId);
   if (!wallet) return { ok: false, reason: 'wallet not found' };
 
