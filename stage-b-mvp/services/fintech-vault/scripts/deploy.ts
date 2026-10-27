@@ -24,13 +24,18 @@ async function main() {
   // let the checkout contract move tokens, nothing else can call pay()
   await (await token.setCheckout(await checkout.getAddress())).wait();
 
-  // seed some SPMT balances for testing — 1 SPMT = 1 unit (18 decimals)
-  const usersAndBalances: [string, number][] = [
-    [deployer.address, 1000],  // arun — 1000 SPMT
+  // same three demo customers as the stage A simulator, on hardhat accounts #2-#4
+  const customers: [string, string, number][] = [
+    ["USR-001", "105.50", 20], // subscriber, can overdraw 20
+    ["USR-002", "62.00", 0],   // not a subscriber
+    ["USR-003", "210.75", 50], // subscriber, can overdraw 50
   ];
-  for (const [addr, amount] of usersAndBalances) {
-    await token.mint(addr, ethers.parseUnits(String(amount), 18));
-    console.log(`minted ${amount} SPMT → ${addr}`);
+  const signers = await ethers.getSigners();
+  for (const [i, [userId, balance, limit]] of customers.entries()) {
+    const addr = signers[i + 2].address;
+    await (await token.mint(addr, ethers.parseUnits(balance, 18))).wait();
+    if (limit > 0) await (await token.addSubscriber(addr, limit)).wait();
+    console.log(`${userId} ${addr} balance ${balance}${limit ? `, overdraft ${limit}` : ""}`);
   }
 
   // the server reads this file, so there's nothing to copy by hand
