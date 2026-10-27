@@ -19,8 +19,12 @@ app.use('/api/checkout', checkoutRoutes);
 app.use('/api/ledger', ledgerRoutes);
 
 app.get('/api/health', async (_req, res) => {
-  const blockNumber = await provider.getBlockNumber();
-  res.json({ status: 'ok', service: 'fintech-vault', stage: 'B', blockNumber });
+  try {
+    const blockNumber = await provider.getBlockNumber();
+    res.json({ status: 'ok', service: 'fintech-vault', stage: 'B', blockNumber });
+  } catch {
+    res.status(503).json({ status: 'down', service: 'fintech-vault', reason: 'chain unreachable' });
+  }
 });
 
 const PORT = process.env.PORT || 3002;
