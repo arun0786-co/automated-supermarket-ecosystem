@@ -21,13 +21,13 @@ export class ProductsService {
     return p;
   }
 
-  // dynamic pricing logic from chapter 4 of the spec
-  // full rule: daysToExpiry < 2 AND stockLevel < discountThreshold → 20% off
-  // this is more complete than stage A which was ignoring stockLevel entirely
+  // dynamic pricing from chapter 4 of the spec:
+  // IF Days_To_Expiry < 2 AND Stock_Level > Threshold THEN Apply_Discount(20%)
+  // i.e. discount stock that won't sell before it expires
   applyPricing(p: Product): { price: number; discounted: boolean } {
-    const nearExpiry = p.daysToExpiry > 0 && p.daysToExpiry <= 2;
-    const lowStock = p.stockLevel < p.discountThreshold;
-    if (nearExpiry && lowStock) {
+    const nearExpiry = p.daysToExpiry > 0 && p.daysToExpiry < 2;
+    const overstocked = p.stockLevel > p.discountThreshold;
+    if (nearExpiry && overstocked) {
       return { price: +(Number(p.price) * 0.8).toFixed(2), discounted: true };
     }
     return { price: Number(p.price), discounted: false };
