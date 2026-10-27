@@ -83,3 +83,16 @@ jobs:
       - run: npx hardhat compile
       - run: npx tsc --noEmit -p .
       - run: npx hardhat test
+
+  ai-engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stage-b-mvp/services/ai-engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
