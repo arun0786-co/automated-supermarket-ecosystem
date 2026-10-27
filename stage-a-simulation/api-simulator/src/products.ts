@@ -32,7 +32,7 @@ export const PRODUCTS: Product[] = [
   // Bakery
   { sku: 'BKR-001', name: 'White Bread',     category: 'Bakery',    price: 2.00, weight: 700,  emoji: '🍞', daysToExpiry: 5  },
   { sku: 'BKR-002', name: 'Sourdough Loaf',  category: 'Bakery',    price: 4.50, weight: 800,  emoji: '🍞', daysToExpiry: 4  },
-  { sku: 'BKR-003', name: 'Croissant x2',    category: 'Bakery',    price: 3.00, weight: 200,  emoji: '🥐', daysToExpiry: 2  },
+  { sku: 'BKR-003', name: 'Croissant x2',    category: 'Bakery',    price: 3.00, weight: 200,  emoji: '🥐', daysToExpiry: 1  },
   // Pantry
   { sku: 'PNT-001', name: 'Cereal Box',      category: 'Pantry',    price: 4.50, weight: 450,  emoji: '🥣', daysToExpiry: 0  },
   { sku: 'PNT-002', name: 'Pasta 500g',      category: 'Pantry',    price: 1.80, weight: 500,  emoji: '🍝', daysToExpiry: 0  },
@@ -52,7 +52,7 @@ export const PRODUCTS: Product[] = [
   { sku: 'SNK-003', name: 'Potato Chips',    category: 'Snacks',    price: 2.20, weight: 180,  emoji: '🥔', daysToExpiry: 0  },
   // Meat & Fish
   { sku: 'MTF-001', name: 'Chicken Breast',  category: 'Meat',      price: 7.50, weight: 500,  emoji: '🍗', daysToExpiry: 3  },
-  { sku: 'MTF-002', name: 'Salmon Fillet',   category: 'Fish',      price: 9.00, weight: 300,  emoji: '🐟', daysToExpiry: 2  },
+  { sku: 'MTF-002', name: 'Salmon Fillet',   category: 'Fish',      price: 9.00, weight: 300,  emoji: '🐟', daysToExpiry: 1  },
   { sku: 'MTF-003', name: 'Eggs x12',        category: 'Dairy',     price: 3.20, weight: 600,  emoji: '🥚', daysToExpiry: 21 },
 ];
 
@@ -60,7 +60,7 @@ export const PRODUCTS: Product[] = [
 // "IF Days_To_Expiry < 2 AND Stock_Level > Threshold THEN Apply_Discount(20%)"
 // i'm ignoring the stock level part for now since we don't have real inventory counts yet
 export function applyDynamicPricing(product: Product): { price: number; discounted: boolean } {
-  if (product.daysToExpiry > 0 && product.daysToExpiry <= 2) {
+  if (product.daysToExpiry > 0 && product.daysToExpiry < 2) {
     return { price: +(product.price * 0.8).toFixed(2), discounted: true };
   }
   return { price: product.price, discounted: false };
