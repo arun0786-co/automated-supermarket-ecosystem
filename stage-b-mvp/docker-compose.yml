@@ -25,7 +25,7 @@ services:
       - "3002:3002"
     environment:
       - CHAIN_RPC=http://hardhat-node:8545
-      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
     depends_on:
       hardhat-node:
         condition: service_healthy
