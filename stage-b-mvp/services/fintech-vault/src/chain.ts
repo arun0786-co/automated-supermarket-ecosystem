@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'fs';
 import { ethers } from 'ethers';
 
 // connection to the hardhat node (or besu in stage C), shared by all routes
@@ -10,12 +11,16 @@ export const signer = new ethers.Wallet(
   provider,
 );
 
-// printed by scripts/deploy.ts. without them every route would fail on first use, so stop early
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set, run npm run deploy:local and copy the addresses`);
+// written by scripts/deploy.ts. env vars win so a deployed chain can be targeted directly
+const DEPLOYMENTS = 'deployments/localhost.json';
+const deployed: Record<string, string> = existsSync(DEPLOYMENTS) ? JSON.parse(readFileSync(DEPLOYMENTS, 'utf8')) : {};
+
+// without these every route would fail on first use, so stop early
+function contractAddress(name: string): string {
+  const value = process.env[name] || deployed[name];
+  if (!value) throw new Error(`${name} is not set, run npm run deploy:local first`);
   return value;
 }
 
-export const tokenAddress = requireEnv('SPMT_TOKEN_ADDRESS');
-export const checkoutAddress = requireEnv('CHECKOUT_ADDRESS');
+export const tokenAddress = contractAddress('SPMT_TOKEN_ADDRESS');
+export const checkoutAddress = contractAddress('CHECKOUT_ADDRESS');

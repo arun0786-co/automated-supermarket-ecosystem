@@ -1,4 +1,5 @@
-import { ethers } from "hardhat";
+import { writeFileSync, mkdirSync } from "fs";
+import { ethers, network } from "hardhat";
 
 // deploy script for local hardhat node
 // run: npx hardhat run scripts/deploy.ts --network localhost
@@ -32,10 +33,14 @@ async function main() {
     console.log(`minted ${amount} SPMT → ${addr}`);
   }
 
-  // print addresses so the backend service can pick them up from env vars
-  console.log("\n--- copy these into your .env ---");
-  console.log(`SPMT_TOKEN_ADDRESS=${await token.getAddress()}`);
-  console.log(`CHECKOUT_ADDRESS=${await checkout.getAddress()}`);
+  // the server reads this file, so there's nothing to copy by hand
+  const addresses = {
+    SPMT_TOKEN_ADDRESS: await token.getAddress(),
+    CHECKOUT_ADDRESS: await checkout.getAddress(),
+  };
+  mkdirSync("deployments", { recursive: true });
+  writeFileSync(`deployments/${network.name}.json`, JSON.stringify(addresses, null, 2) + "\n");
+  console.log(`addresses written to deployments/${network.name}.json`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
