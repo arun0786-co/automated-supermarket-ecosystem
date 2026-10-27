@@ -1,19 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductsModule } from './products/products.module';
+import { dbOptions } from './db/config';
 
 @Module({
   imports: [
-    // postgres connection — credentials come from env vars (or docker-compose environment block)
     TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      username: process.env.DB_USER || 'ase',
-      password: process.env.DB_PASS,
-      database: process.env.DB_NAME || 'ase_products',
+      ...dbOptions,
       autoLoadEntities: true,
-      synchronize: true, // don't use this in production — use migrations instead
+      synchronize: true, // fine for the MVP, switch to migrations before real data
     }),
     ProductsModule,
   ],
