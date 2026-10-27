@@ -66,12 +66,12 @@ describe("Checkout", () => {
 
   it("only the checkout contract can call pay", async () => {
     const { owner, alice, token } = await deploy();
-    await expect(token.connect(owner).pay(alice.address, 1)).to.be.revertedWith("only checkout contract");
+    await expect((token.connect(owner) as typeof token).pay(alice.address, 1)).to.be.revertedWith("only checkout contract");
   });
 
   it("only the owner can run checkouts", async () => {
     const { alice, checkout } = await deploy();
-    await expect(checkout.connect(alice).processCheckout(alice.address, 1, ethers.ZeroHash))
+    await expect((checkout.connect(alice) as typeof checkout).processCheckout(alice.address, 1, ethers.ZeroHash))
       .to.be.revertedWith("not owner");
   });
 });
