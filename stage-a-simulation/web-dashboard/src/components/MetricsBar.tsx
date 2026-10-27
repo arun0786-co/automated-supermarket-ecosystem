@@ -11,7 +11,7 @@ export default function MetricsBar({ trolleys, txCount, checkoutCount }: Props) 
   const totalWeight = trolleys.reduce((s, t) => s + t.totalWeight, 0);
 
   const metrics = [
-    { icon: ShoppingCart, label: 'Shopping',     value: active || trolleys.length, color: 'text-cyan-400',   bg: 'bg-cyan-500/10   border-cyan-500/20' },
+    { icon: ShoppingCart, label: 'Shopping',     value: active,                   color: 'text-cyan-400',   bg: 'bg-cyan-500/10   border-cyan-500/20' },
     { icon: Zap,          label: 'Items Scanned', value: txCount,                   color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
     { icon: Activity,     label: 'Checkouts',    value: checkoutCount,              color: 'text-emerald-400',bg: 'bg-emerald-500/10 border-emerald-500/20' },
     { icon: Users,        label: 'Checking Out', value: checkout,                  color: 'text-amber-400',  bg: 'bg-amber-500/10  border-amber-500/20' },
