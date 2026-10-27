@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
-// stage B product-core service — Service A from the spec
+// stage B product-core service: Service A from the spec
 // this replaces the flat PRODUCTS array in the stage A simulator with a real postgres-backed API
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

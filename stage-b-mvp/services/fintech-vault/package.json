@@ -1,7 +1,7 @@
 {
   "name": "fintech-vault",
   "version": "1.0.0",
-  "description": "service C — blockchain wallet, SPMT token, checkout contracts",
+  "description": "service C: blockchain wallet, SPMT token, checkout contracts",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",

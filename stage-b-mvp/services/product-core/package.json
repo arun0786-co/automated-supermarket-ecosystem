@@ -1,7 +1,7 @@
 {
   "name": "product-core",
   "version": "1.0.0",
-  "description": "service A — product catalog, inventory, dynamic pricing",
+  "description": "service A: product catalog, inventory, dynamic pricing",
   "scripts": {
     "start": "node dist/main.js",
     "dev": "ts-node-dev --respawn src/main.ts",

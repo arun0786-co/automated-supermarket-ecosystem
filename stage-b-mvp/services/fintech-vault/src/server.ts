@@ -6,7 +6,7 @@ import checkoutRoutes from './routes/checkout';
 import ledgerRoutes from './routes/ledger';
 import { latestBlock } from './chain';
 
-// fintech vault — service C backend
+// fintech vault: service C backend
 // sits between the REST API and the actual solidity contracts
 // stage A was doing all of this with in-memory maps and SHA256 fakes
 // now it's real ethers.js calls to contracts deployed on a local hardhat node
@@ -29,5 +29,5 @@ app.get('/api/health', async (_req, res) => {
 
 const PORT = process.env.PORT || 3002;
 createServer(app).listen(PORT, () => {
-  console.log(`fintech-vault → http://localhost:${PORT}`);
+  console.log(`fintech-vault on http://localhost:${PORT}`);
 });

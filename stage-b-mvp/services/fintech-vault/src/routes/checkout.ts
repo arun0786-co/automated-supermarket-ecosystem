@@ -21,7 +21,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   try {
-    // build the cart hash — keccak256 of sorted SKUs so order doesn't matter
+    // build the cart hash, keccak256 of sorted SKUs so order doesn't matter
     const skus = (cartItems ?? []).map((i: any) => i.sku).sort().join(',');
     const cartHash = ethers.keccak256(ethers.toUtf8Bytes(skus));
 
@@ -38,7 +38,7 @@ router.post('/', async (req: Request, res: Response) => {
     if (purchaseEvent) {
       res.json({ ok: true, hash: tx.hash, blockNumber: receipt.blockNumber, cartHash });
     } else {
-      // transaction mined but Purchase event not emitted — means CheckoutFailed was emitted
+      // transaction mined but Purchase event not emitted, means CheckoutFailed was emitted
       res.json({ ok: false, hash: tx.hash, reason: 'insufficient funds or overdraft limit reached' });
     }
   } catch (err: any) {

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// $SPMT token — pegged 1:1 to local fiat (chapter 6 of the spec)
+// $SPMT token, pegged 1:1 to local fiat (chapter 6 of the spec)
 // store keeps a reserve fund that backs every token in circulation
 // using openzeppelin ERC20 as the base since i don't want to rewrite transfer logic from scratch
 contract SPMTToken is ERC20, Ownable {
@@ -14,7 +14,7 @@ contract SPMTToken is ERC20, Ownable {
     mapping(address => bool) public isSubscriber;
     // subscriber overdraft limit in SPMT (18 decimals)
     mapping(address => uint256) public overdraftLimit;
-    // current overdraft balances — how much each subscriber owes
+    // current overdraft balances, how much each subscriber owes
     mapping(address => uint256) public overdraftOwed;
 
     // the only contract allowed to call pay(). set once Checkout is deployed
@@ -51,24 +51,24 @@ contract SPMTToken is ERC20, Ownable {
         emit SubscriberAdded(user, limitInSPMT);
     }
 
-    // checkout is called by the Checkout contract — not directly by customers
+    // checkout is called by the Checkout contract, not directly by customers
     // this function handles both normal payment and subscriber overdraft
     function pay(address from, uint256 amount) external onlyCheckout returns (bool) {
         uint256 balance = balanceOf(from);
         if (balance >= amount) {
-            // normal case — enough tokens in wallet
+            // normal case, enough tokens in wallet
             _transfer(from, storeWallet, amount);
             return true;
         }
         if (isSubscriber[from]) {
-            // subscriber overdraft — check how much headroom they have left
+            // subscriber overdraft, check how much headroom they have left
             uint256 shortfall = amount - balance;
             uint256 remainingLimit = overdraftLimit[from] - overdraftOwed[from];
             if (shortfall <= remainingLimit) {
                 if (balance > 0) {
                     _transfer(from, storeWallet, balance);
                 }
-                // mint the shortfall directly to the store — fiat recovery handles this later
+                // mint the shortfall directly to the store, fiat recovery handles this later
                 _mint(storeWallet, shortfall);
                 overdraftOwed[from] += shortfall;
                 emit OverdraftUsed(from, shortfall, overdraftOwed[from]);
