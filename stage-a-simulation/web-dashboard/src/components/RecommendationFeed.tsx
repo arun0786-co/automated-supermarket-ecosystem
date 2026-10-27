@@ -29,9 +29,9 @@ type Props = { scanEvents: ScanEvent[] };
 
 export default function RecommendationFeed({ scanEvents }: Props) {
   const recs = useMemo(() => {
-    // rejected scans never reached the cart, so don't recommend off them
-    const latest = scanEvents.find((e) => e.event.accepted);
-    return (latest && RECS[latest.event.sku]) || TRENDING;
+    // newest accepted scan that has pairings. rejected scans never reached the cart
+    const latest = scanEvents.find((e) => e.event.accepted && RECS[e.event.sku]);
+    return latest ? RECS[latest.event.sku] : TRENDING;
   }, [scanEvents]);
 
   return (
