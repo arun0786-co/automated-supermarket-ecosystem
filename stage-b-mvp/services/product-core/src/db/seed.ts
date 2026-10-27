@@ -1,20 +1,12 @@
 import { DataSource } from 'typeorm';
 import { Product } from '../products/product.entity';
+import { dbOptions } from './config';
 
 // run once to populate the products table from the stage A catalog
-// usage: ts-node src/db/seed.ts
-const ds = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: 5432,
-  username: 'ase',
-  password: process.env.DB_PASS,
-  database: 'ase_products',
-  entities: [Product],
-  synchronize: true,
-});
+// usage: npm run seed
+const ds = new DataSource({ ...dbOptions, entities: [Product], synchronize: true });
 
-// copied straight from stage A products.ts — same data, now going into postgres
+// copied from stage A products.ts, same data, now going into postgres
 const SEED_DATA: Partial<Product>[] = [
   { sku: 'PRD-001', name: 'Banana',          category: 'Produce',   price: 1.20, weight: 150,  emoji: '🍌', daysToExpiry: 5,  stockLevel: 80 },
   { sku: 'PRD-002', name: 'Apple',           category: 'Produce',   price: 0.80, weight: 182,  emoji: '🍎', daysToExpiry: 14, stockLevel: 120 },

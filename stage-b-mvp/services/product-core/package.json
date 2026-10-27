@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node dist/main.js",
     "dev": "ts-node-dev --respawn src/main.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "seed": "ts-node-dev src/db/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
