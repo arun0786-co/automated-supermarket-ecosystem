@@ -51,12 +51,12 @@ autimated-supermarket-system/
 │   ├── architecture.md       # mermaid diagrams, data flow, tech decisions
 │   ├── api-reference.md      # all REST endpoints + websocket event schemas
 │   └── roadmap.md            # what's done, what's next
-├── stage-a-simulation/       # Phase 1 — fully working
+├── stage-a-simulation/       # Phase 1, fully working
 │   ├── api-simulator/        # Node.js backend (trolley sim, mock blockchain, product API)
 │   ├── mobile-app/           # Flutter customer app (cart, wallet, home screen)
 │   └── web-dashboard/        # Next.js admin dashboard (live map, ledger, scan feed)
-├── stage-b-mvp/              # Phase 2 — docker-compose scaffold ready, services to build
-├── stage-c-production/       # Phase 3 — hardware spec and roadmap
+├── stage-b-mvp/              # Phase 2, product-core, vault and ai-engine run in docker compose
+├── stage-c-production/       # Phase 3, hardware spec and roadmap
 ├── Makefile                  # install, start and stop shortcuts
 └── README.md
 ```
@@ -67,12 +67,12 @@ autimated-supermarket-system/
 make install
 ```
 
-This installs the api-simulator and web-dashboard dependencies. Run `make help` for the
-other shortcuts.
+This installs the api-simulator and web-dashboard dependencies. `make test` runs every
+test suite, and `make help` lists the other shortcuts.
 
 ## Running the Sim (Stage A)
 
-Two terminals needed.
+`make stage-a` starts both servers. To run them separately, use two terminals.
 
 **Terminal 1 — Backend**
 ```bash
@@ -116,10 +116,12 @@ curl http://localhost:3001/api/ledger
 
 Every 800ms the backend ticks all 5 virtual trolleys. Each trolley does a smooth random walk
 around the 800×600 store floor (same coords the canvas map uses, so positions map directly).
-There's a 5% chance per tick that a trolley's "load cell" triggers a scan — the simulator
-picks a random product, runs fake YOLOv8 confidence scoring, adds ±5% weight noise, and
-checks if the result passes the 0.60 confidence threshold. If it does, the item gets added
-to the cart and a SCAN_EVENT fires over WebSocket to every connected client.
+There's a 5% chance per tick that a trolley's "load cell" triggers a scan. The simulator
+picks a random product, fakes a YOLOv8 confidence score and a load cell reading (±5g, the
+spec's precision), and about 1 in 10 scans is deliberately blurry or misidentified. The
+fusion step from chapter 5 accepts the scan only if confidence is at least 0.60 and the
+weight is within 10g of the catalog weight. Accepted items go into the cart; either way a
+SCAN_EVENT fires over WebSocket to every connected client.
 
 When a cart hits 15 items it auto-checkouts — that calls the mock blockchain checkout function
 which implements the Limited Overdraft contract from chapter 6 of the spec, generates a real
