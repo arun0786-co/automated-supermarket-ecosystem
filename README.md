@@ -68,7 +68,8 @@ make install
 ```
 
 This installs the api-simulator and web-dashboard dependencies. `make test` runs every
-test suite, and `make help` lists the other shortcuts.
+test suite, and `make help` lists the other shortcuts. The same suites run on GitHub
+Actions for every push (`.github/workflows/test.yml`).
 
 ## Running the Sim (Stage A)
 
