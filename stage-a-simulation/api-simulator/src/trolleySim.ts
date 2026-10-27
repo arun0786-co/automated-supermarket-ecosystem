@@ -72,9 +72,19 @@ export function startTrolleySimulation(broadcast: (data: unknown) => void) {
         const { price, discounted } = applyDynamicPricing(product);
         // produce is harder for yolov8 to classify, so confidence baseline is lower
         const baseConf = product.category === 'Produce' ? 0.75 : 0.85;
-        const confidence = +(baseConf + Math.random() * 0.14).toFixed(3);
+        let confidence = +(baseConf + Math.random() * 0.14).toFixed(3);
         // the load cells are precise to ±5g (chapter 2 of the spec)
-        const weightDelta = +(product.weight + (Math.random() - 0.5) * 10).toFixed(1);
+        let weightDelta = +(product.weight + (Math.random() - 0.5) * 10).toFixed(1);
+
+        // roughly 1 in 10 scans goes wrong so the reject path shows up in the demo:
+        // a blurry frame (low confidence) or the camera naming the wrong item
+        const roll = Math.random();
+        if (roll < 0.05) {
+          confidence = +(0.3 + Math.random() * 0.29).toFixed(3);
+        } else if (roll < 0.10) {
+          const actual = PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)];
+          weightDelta = +(actual.weight + (Math.random() - 0.5) * 10).toFixed(1);
+        }
 
         const item: CartItem = { sku: product.sku, name: product.name, confidence, weightDelta, price, discounted, ts: new Date().toISOString() };
         const { accepted } = fuseScan(product, confidence, weightDelta);
