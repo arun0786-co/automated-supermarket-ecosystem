@@ -1,12 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
-import { signer } from '../chain';
+import { signer, tokenAddress } from '../chain';
 import SPMTTokenABI from '../../artifacts/contracts/SPMTToken.sol/SPMTToken.json';
 
 const router = Router();
-
-// load contract address from env — set by deploy script output
-const tokenAddress = process.env.SPMT_TOKEN_ADDRESS!;
 
 function getToken() {
   return new ethers.Contract(tokenAddress, SPMTTokenABI.abi, signer);

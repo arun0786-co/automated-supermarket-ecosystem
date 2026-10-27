@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
-import { signer } from '../chain';
+import { signer, checkoutAddress } from '../chain';
 import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
 
 const router = Router();
-const checkoutAddress = process.env.CHECKOUT_ADDRESS!;
 
 function getCheckout() {
   return new ethers.Contract(checkoutAddress, CheckoutABI.abi, signer);

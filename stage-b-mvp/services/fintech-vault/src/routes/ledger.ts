@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
-import { provider } from '../chain';
+import { provider, checkoutAddress } from '../chain';
 import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
 
 const router = Router();
-const checkoutAddress = process.env.CHECKOUT_ADDRESS!;
 
 // GET /api/ledger?limit=20&page=0
 // reads Purchase events directly from the chain — no off-chain DB needed
