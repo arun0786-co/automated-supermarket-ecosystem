@@ -15,8 +15,28 @@ class CartState extends ChangeNotifier {
   // trolley we're tracking (in stage B this comes from QR code scan at store entrance)
   final String trolleyId = 'TROLLEY-100';
 
-  CartState() {
-    _connect();
+  // connect: false lets tests drive handleMessage without a simulator running
+  CartState({bool connect = true}) {
+    if (connect) _connect();
+  }
+
+  @visibleForTesting
+  void handleMessage(Map<String, dynamic> msg) {
+    if (msg['type'] == 'SCAN_EVENT' && msg['trolleyId'] == trolleyId) {
+      final event = msg['event'] as Map<String, dynamic>;
+      if (event['accepted'] == true) {
+        items.add(event);
+        total = double.parse((total + (event['price'] as num).toDouble()).toStringAsFixed(2));
+        notifyListeners();
+      }
+    }
+
+    if (msg['type'] == 'CHECKOUT_EVENT' && msg['trolleyId'] == trolleyId) {
+      // reset cart on checkout
+      items.clear();
+      total = 0.0;
+      notifyListeners();
+    }
   }
 
   // set in dispose so a late onDone doesn't schedule another reconnect
@@ -34,25 +54,7 @@ class CartState extends ChangeNotifier {
       notifyListeners();
 
       channel.stream.listen(
-        (raw) {
-          final msg = jsonDecode(raw as String) as Map<String, dynamic>;
-
-          if (msg['type'] == 'SCAN_EVENT' && msg['trolleyId'] == trolleyId) {
-            final event = msg['event'] as Map<String, dynamic>;
-            if (event['accepted'] == true) {
-              items.add(event);
-              total = double.parse((total + (event['price'] as num).toDouble()).toStringAsFixed(2));
-              notifyListeners();
-            }
-          }
-
-          if (msg['type'] == 'CHECKOUT_EVENT' && msg['trolleyId'] == trolleyId) {
-            // reset cart on checkout
-            items.clear();
-            total = 0.0;
-            notifyListeners();
-          }
-        },
+        (raw) => handleMessage(jsonDecode(raw as String) as Map<String, dynamic>),
         onDone: _retry,
         // onDone follows the error, which handles the retry
         onError: (_) {},
