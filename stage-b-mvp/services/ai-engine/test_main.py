@@ -52,3 +52,11 @@ def test_falls_back_to_trending_for_empty_cart(client):
 def test_respects_limit(client):
     res = client.post("/api/recommendations", json={"userId": "USR-001", "cartItems": [item("PRD-001")], "limit": 1})
     assert len(res.json()) == 1
+
+
+def test_reason_comes_from_the_strongest_pairing(client):
+    # apple -> yogurt scores 0.85, banana -> yogurt scores 0.92, so the banana reason wins
+    # no matter which item was scanned first
+    res = client.post("/api/recommendations", json={"userId": "USR-001", "cartItems": [item("PRD-002"), item("PRD-001")]})
+    yogurt = next(r for r in res.json() if r["sku"] == "DRY-003")
+    assert yogurt["reason"] == "commonly bought together"
