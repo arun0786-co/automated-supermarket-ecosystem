@@ -45,7 +45,7 @@ export default function RecommendationFeed({ scanEvents }: Props) {
         {recs.map((r, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 rounded-xl bg-slate-800/40 hover:bg-slate-800/70 transition-colors px-3 py-2.5 cursor-pointer"
+            className="flex items-center gap-3 rounded-xl bg-slate-800/40 hover:bg-slate-800/70 transition-colors px-3 py-2.5"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/30 to-orange-500/20 border border-amber-500/20 flex items-center justify-center text-base shrink-0">
               {r.emoji}
@@ -54,9 +54,6 @@ export default function RecommendationFeed({ scanEvents }: Props) {
               <p className="text-sm text-white font-medium truncate">{r.item}</p>
               <p className="text-xs text-slate-400 truncate">{r.reason}</p>
             </div>
-            <button className="ml-auto text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded-lg transition-colors shrink-0">
-              Add
-            </button>
           </div>
         ))}
       </div>
