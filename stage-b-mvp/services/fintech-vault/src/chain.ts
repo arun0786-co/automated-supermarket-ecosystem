@@ -6,6 +6,11 @@ export const provider = new ethers.JsonRpcProvider(process.env.CHAIN_RPC || 'htt
 
 // signer is the deployer account, which owns both contracts.
 // the fallback is hardhat's public test account #0, never use it on a real chain
+// provider.getBlockNumber() is cached for a few seconds, ask the node directly
+export async function latestBlock(): Promise<number> {
+  return Number(await provider.send('eth_blockNumber', []));
+}
+
 // NonceManager hands out nonces locally, otherwise back-to-back requests can read the same
 // pending nonce from the node and one of the transactions gets rejected
 export const signer = new ethers.NonceManager(

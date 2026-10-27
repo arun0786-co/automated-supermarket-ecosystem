@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import walletRoutes from './routes/wallet';
 import checkoutRoutes from './routes/checkout';
 import ledgerRoutes from './routes/ledger';
-import { provider } from './chain';
+import { latestBlock } from './chain';
 
 // fintech vault — service C backend
 // sits between the REST API and the actual solidity contracts
@@ -20,7 +20,7 @@ app.use('/api/ledger', ledgerRoutes);
 
 app.get('/api/health', async (_req, res) => {
   try {
-    const blockNumber = await provider.getBlockNumber();
+    const blockNumber = await latestBlock();
     res.json({ status: 'ok', service: 'fintech-vault', stage: 'B', blockNumber });
   } catch {
     res.status(503).json({ status: 'down', service: 'fintech-vault', reason: 'chain unreachable' });
