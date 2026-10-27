@@ -74,16 +74,16 @@ TRENDING = [
     {"sku": "PRD-004", "reason": "staff pick"},
 ]
 
-async def fetch_product(sku: str) -> dict | None:
-    """fetch single product from product-core service"""
+async def fetch_catalog() -> dict[str, dict]:
+    """whole priced catalog from product-core in one request, keyed by sku"""
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
-            r = await client.get(f"{PRODUCT_CORE_URL}/api/products/{sku}")
+            r = await client.get(f"{PRODUCT_CORE_URL}/api/products")
             if r.status_code == 200:
-                return r.json()
-    except Exception:
+                return {p["sku"]: p for p in r.json()}
+    except httpx.HTTPError:
         pass
-    return None
+    return {}
 
 @app.get("/api/health")
 def health():
@@ -116,9 +116,11 @@ async def get_recommendations(req: RecommendationRequest):
         ranked = [(item["sku"], 0.5) for item in TRENDING[:req.limit]]
         candidate_reasons = {item["sku"]: item["reason"] for item in TRENDING}
 
+    catalog = await fetch_catalog()
     results: List[Recommendation] = []
-    for sku, score in ranked[:req.limit * 2]:  # fetch more than needed in case some 404
-        product = await fetch_product(sku)
+    for sku, score in ranked:
+        # skip anything product-core doesn't know about or has deactivated
+        product = catalog.get(sku)
         if not product:
             continue
         results.append(Recommendation(
@@ -137,10 +139,11 @@ async def get_recommendations(req: RecommendationRequest):
 
 @app.get("/api/recommendations/trending", response_model=List[Recommendation])
 async def trending():
-    """returns hardcoded trending items — useful when there's no cart context"""
+    """returns hardcoded trending items, useful when there's no cart context"""
+    catalog = await fetch_catalog()
     results = []
     for item in TRENDING:
-        product = await fetch_product(item["sku"])
+        product = catalog.get(item["sku"])
         if product:
             results.append(Recommendation(
                 sku=item["sku"],
