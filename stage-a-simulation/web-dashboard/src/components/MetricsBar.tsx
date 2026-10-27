@@ -1,6 +1,6 @@
 'use client';
 
-import { ShoppingCart, Zap, Activity, Users, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Zap, Activity, Users, Weight } from 'lucide-react';
 import type { Trolley } from '@/app/page';
 
 type Props = { trolleys: Trolley[]; txCount: number; checkoutCount: number };
@@ -15,7 +15,7 @@ export default function MetricsBar({ trolleys, txCount, checkoutCount }: Props) 
     { icon: Zap,          label: 'Items Scanned', value: txCount,                   color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
     { icon: Activity,     label: 'Checkouts',    value: checkoutCount,              color: 'text-emerald-400',bg: 'bg-emerald-500/10 border-emerald-500/20' },
     { icon: Users,        label: 'Checking Out', value: checkout,                  color: 'text-amber-400',  bg: 'bg-amber-500/10  border-amber-500/20' },
-    { icon: AlertTriangle,label: 'Kg in Carts',  value: (totalWeight / 1000).toFixed(1), color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' },
+    { icon: Weight,       label: 'Kg in Carts',  value: (totalWeight / 1000).toFixed(1), color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' },
   ];
 
   return (
