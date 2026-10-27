@@ -95,7 +95,7 @@ export default function StoreMap({ trolleys }: Props) {
       ctx.fillText(t.id.replace('TROLLEY-', 'T-'), t.x, t.y - 12);
 
       // item count badge
-      if (t.cartItems.length > 0) {
+      if (t.itemCount > 0) {
         ctx.fillStyle = '#1e293b';
         ctx.beginPath();
         ctx.arc(t.x + 8, t.y - 8, 7, 0, Math.PI * 2);
@@ -103,7 +103,7 @@ export default function StoreMap({ trolleys }: Props) {
         ctx.fillStyle = color;
         ctx.font = 'bold 7px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText(String(t.cartItems.length), t.x + 8, t.y - 5);
+        ctx.fillText(String(t.itemCount), t.x + 8, t.y - 5);
       }
     });
   }, [trolleys]);
