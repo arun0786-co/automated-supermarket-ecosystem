@@ -77,11 +77,13 @@ export function startTrolleySimulation(broadcast: (data: unknown) => void) {
         const weightDelta = +(product.weight * (0.95 + Math.random() * 0.1)).toFixed(1);
 
         const item: CartItem = { sku: product.sku, name: product.name, confidence, weightDelta, price, discounted, ts: new Date().toISOString() };
-        t.cartItems.push(item);
-        t.totalWeight += weightDelta;
-        t.cartTotal = +(t.cartTotal + price).toFixed(2);
-
         const { accepted } = fuseScan(product, confidence, weightDelta);
+        // rejected scans are reported but never reach the cart or the bill
+        if (accepted) {
+          t.cartItems.push(item);
+          t.totalWeight += weightDelta;
+          t.cartTotal = +(t.cartTotal + price).toFixed(2);
+        }
         broadcast({ type: 'SCAN_EVENT', trolleyId: t.id, userId: t.userId, event: { ...item, accepted } });
 
         // auto-checkout at 15 items, calls the mock blockchain checkout
