@@ -74,36 +74,36 @@ export default function StoreMap({ trolleys }: Props) {
       const color = TROLLEY_COLORS[i % TROLLEY_COLORS.length];
 
       // glow ring
-      const grad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 18);
+      const grad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 24);
       grad.addColorStop(0, color + '66');
       grad.addColorStop(1, 'transparent');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(t.x, t.y, 18, 0, Math.PI * 2);
+      ctx.arc(t.x, t.y, 24, 0, Math.PI * 2);
       ctx.fill();
 
       // dot
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(t.x, t.y, 6, 0, Math.PI * 2);
+      ctx.arc(t.x, t.y, 8, 0, Math.PI * 2);
       ctx.fill();
 
       // id label
       ctx.fillStyle = color;
-      ctx.font = 'bold 8px system-ui';
+      ctx.font = 'bold 12px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText(t.id.replace('TROLLEY-', 'T-'), t.x, t.y - 12);
+      ctx.fillText(t.id.replace('TROLLEY-', 'T-'), t.x - 6, t.y - 24);
 
       // item count badge
       if (t.itemCount > 0) {
         ctx.fillStyle = '#1e293b';
         ctx.beginPath();
-        ctx.arc(t.x + 8, t.y - 8, 7, 0, Math.PI * 2);
+        ctx.arc(t.x + 11, t.y - 11, 9, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = color;
-        ctx.font = 'bold 7px system-ui';
+        ctx.font = 'bold 10px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText(String(t.itemCount), t.x + 8, t.y - 5);
+        ctx.fillText(String(t.itemCount), t.x + 11, t.y - 7);
       }
     });
   }, [trolleys]);
