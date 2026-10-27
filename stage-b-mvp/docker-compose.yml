@@ -55,9 +55,9 @@ services:
 
   # ── Local Blockchain (replaces Hyperledger Besu in dev) ─────
   hardhat-node:
-    image: node:20-alpine
-    working_dir: /app
-    command: sh -c "npm install -g hardhat && npx hardhat node --hostname 0.0.0.0"
+    # same image as the vault so `hardhat node` runs inside the hardhat project
+    build: ./services/fintech-vault
+    command: ["npx", "hardhat", "node", "--hostname", "0.0.0.0"]
     ports:
       - "8545:8545"
 
