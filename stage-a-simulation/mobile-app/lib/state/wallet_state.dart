@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config.dart';
 
 // WalletState manages $SPMT balance for the logged-in user.
 // polls the REST API every 5 seconds — in Stage B this becomes
@@ -16,7 +17,7 @@ class WalletState extends ChangeNotifier {
 
   Future<void> _fetchBalance() async {
     try {
-      final res = await http.get(Uri.parse('http://localhost:3001/api/wallets/$userId'));
+      final res = await http.get(Uri.parse('$simHttp/api/wallets/$userId'));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         balance = (data['balance'] as num).toDouble();
