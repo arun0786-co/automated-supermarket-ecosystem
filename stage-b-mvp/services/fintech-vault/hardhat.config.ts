@@ -14,10 +14,11 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
+    // CHAIN_RPC points at the hardhat-node container under docker compose
     localhost: {
-      url: "http://127.0.0.1:8545",
+      url: process.env.CHAIN_RPC || "http://127.0.0.1:8545",
     },
-    // hardhat in-process network for tests — no node needed
+    // hardhat in-process network for tests, no node needed
     hardhat: {
       chainId: 31337,
     },
