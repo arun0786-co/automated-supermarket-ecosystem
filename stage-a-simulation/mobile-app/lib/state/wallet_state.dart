@@ -11,6 +11,8 @@ class WalletState extends ChangeNotifier {
   double balance = 105.50;
   String userId  = 'USR-001';
   String name    = 'Arun K.';
+  double overdraftLimit = 0;
+  bool isSubscriber = false;
 
   Timer? _poll;
   bool _disposed = false;
@@ -26,6 +28,9 @@ class WalletState extends ChangeNotifier {
       if (res.statusCode == 200 && !_disposed) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         balance = (data['balance'] as num).toDouble();
+        name = data['name'] as String;
+        overdraftLimit = (data['overdraftLimit'] as num).toDouble();
+        isSubscriber = data['isSubscriber'] as bool;
         notifyListeners();
       }
     } catch (_) { /* offline, keep cached value */ }
