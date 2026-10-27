@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
 import { signer, checkoutAddress } from '../chain';
+import { isAddress, parseAmount } from '../validate';
 import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
 
 const router = Router();
@@ -14,8 +15,9 @@ function getCheckout() {
 // cartItems is used to compute the cart hash stored on-chain for the audit trail
 router.post('/', async (req: Request, res: Response) => {
   const { customer, amount, cartItems } = req.body;
-  if (!customer || !amount) {
-    return res.status(400).json({ error: 'customer and amount required' });
+  const amountInWei = parseAmount(amount);
+  if (!isAddress(customer) || amountInWei === null) {
+    return res.status(400).json({ error: 'customer address and a positive amount required' });
   }
 
   try {
@@ -24,7 +26,6 @@ router.post('/', async (req: Request, res: Response) => {
     const cartHash = ethers.keccak256(ethers.toUtf8Bytes(skus));
 
     const checkout = getCheckout();
-    const amountInWei = ethers.parseUnits(String(amount), 18);
 
     const tx = await checkout.processCheckout(customer, amountInWei, cartHash);
     const receipt = await tx.wait();
