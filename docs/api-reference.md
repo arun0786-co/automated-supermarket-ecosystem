@@ -33,19 +33,19 @@ Returns full product catalog with dynamic pricing applied.
 ```json
 [
   {
-    "sku": "PRD-001",
-    "name": "Banana",
-    "category": "Produce",
-    "price": 0.96,
-    "weight": 150,
-    "emoji": "🍌",
-    "daysToExpiry": 5,
+    "sku": "BKR-003",
+    "name": "Croissant x2",
+    "category": "Bakery",
+    "price": 2.40,
+    "weight": 200,
+    "emoji": "🥐",
+    "daysToExpiry": 1,
     "discounted": true
   }
 ]
 ```
 
-> Items with `daysToExpiry <= 2` will have `discounted: true` and price reduced 20%.
+> Perishables with `daysToExpiry < 2` get `discounted: true` and 20% off (chapter 4 of the spec). `daysToExpiry: 0` means non-perishable and is never discounted. Stage A ignores stock levels; Stage B product-core also requires `stockLevel > discountThreshold`.
 
 **GET** `/api/products/:sku`
 
@@ -82,14 +82,21 @@ Request:
 { "userId": "USR-001", "amount": 12.50 }
 ```
 
+`amount` must be a positive number, otherwise the endpoint returns `400`.
+
 Response (success):
 ```json
 { "ok": true, "hash": "0xa4f3b2..." }
 ```
 
+Response (subscriber overdraft, balance went below zero):
+```json
+{ "ok": true, "hash": "0xa4f3b2...", "overdraftUsed": 7.25 }
+```
+
 Response (failure):
 ```json
-{ "ok": false, "reason": "Insufficient funds" }
+{ "ok": false, "reason": "insufficient funds" }
 ```
 
 ---
@@ -117,7 +124,7 @@ Returns last 50 blockchain transactions in reverse chronological order.
 }
 ```
 
-Transaction types: `PURCHASE` | `OVERDRAFT_RECOVERY`
+Transaction types: `PURCHASE` | `OVERDRAFT` (subscriber checkout that took the balance below zero)
 
 ---
 
@@ -128,7 +135,7 @@ Connect to `ws://localhost:3001`. All events are JSON strings.
 ### `INFO`
 Sent once on connection.
 ```json
-{ "type": "INFO", "message": "Connected to ASE Fleet Engine", "blockHeight": 10000 }
+{ "type": "INFO", "message": "connected to ASE fleet engine", "blockHeight": 10000 }
 ```
 
 ### `TROLLEY_POSITIONS`
@@ -144,6 +151,7 @@ Broadcast every 800ms with all active trolley states.
       "y": 218.3,
       "status": "SHOPPING",
       "cartItems": [],
+      "itemCount": 6,
       "totalWeight": 1250.0,
       "cartTotal": 14.20
     }
@@ -151,8 +159,10 @@ Broadcast every 800ms with all active trolley states.
 }
 ```
 
+> `cartItems` only carries the last 3 items to keep the payload small; `itemCount` is the full cart size.
+
 ### `SCAN_EVENT`
-Fired when load cell detects weight change and YOLOv8 inference succeeds.
+Fired for every load cell weight change, whether the scan is accepted or rejected.
 ```json
 {
   "type": "SCAN_EVENT",
@@ -161,15 +171,20 @@ Fired when load cell detects weight change and YOLOv8 inference succeeds.
   "event": {
     "sku": "PNT-001",
     "name": "Cereal Box",
+    "emoji": "🥣",
     "confidence": 0.924,
     "weightDelta": 447.3,
     "price": 4.50,
     "discounted": false,
+    "ts": "2026-10-27T07:32:05.000Z",
     "accepted": true
   }
 }
 ```
-> `accepted: false` when confidence < 0.60 (conflict resolution — item not added to cart)
+> The simulator fuses the vision and weight readings (chapter 5 of the spec). The scan is
+> rejected, with `accepted: false` and a `reason`, when confidence is below 0.60
+> (`"low confidence"`) or the load cell reading is more than 10g off the catalog weight
+> (`"weight mismatch"`). Rejected items never reach the cart or the bill.
 
 ### `CHECKOUT_EVENT`
 Fired when cart hits 15 items and blockchain checkout runs.
@@ -184,3 +199,4 @@ Fired when cart hits 15 items and blockchain checkout runs.
   "hash": "0xdbe90a987665df74335f680d0dbbc1dd783035ee"
 }
 ```
+> Carries the same `ok`, `hash`, `reason` and `overdraftUsed` fields as `POST /api/checkout`.
