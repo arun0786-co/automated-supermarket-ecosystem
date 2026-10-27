@@ -21,9 +21,9 @@ export default function ScanFeed({ events }: Props) {
           <p className="text-slate-500 text-xs p-4 text-center">Waiting for trolley events…</p>
         ) : (
           events.map((e, i) => {
-            // confidence is already a number from the updated CartItem type
+            // the simulator's fusion step decides, the dashboard just shows the result
             const conf = e.event.confidence;
-            const ok = conf >= 0.80;
+            const ok = e.event.accepted;
             return (
               <div
                 key={i}
@@ -34,9 +34,10 @@ export default function ScanFeed({ events }: Props) {
                   ? <CheckCircle size={14} className="text-emerald-400 shrink-0 mt-0.5" />
                   : <XCircle size={14} className="text-rose-400 shrink-0 mt-0.5" />}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-100 font-medium truncate">{e.event.name}</p>
+                  <p className="text-sm text-slate-100 font-medium truncate">{e.event.emoji} {e.event.name}</p>
                   <p className="text-xs text-slate-400">
                     {e.trolleyId} · {e.event.weightDelta.toFixed(0)}g · {e.ts}
+                    {!ok && e.event.reason && <span className="text-rose-400"> · {e.event.reason}</span>}
                   </p>
                 </div>
                 <span
