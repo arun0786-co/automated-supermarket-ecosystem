@@ -53,7 +53,8 @@ Deploy to real smart trolleys and a cloud Kubernetes cluster.
 - [ ] Implement D* dynamic pathfinding for obstacle avoidance
 - [ ] Migrate Hardhat → Hyperledger Besu (private EVM, IBFT 2.0 consensus)
 - [ ] Kubernetes manifests for all services (EKS or GKE)
-- [ ] CI/CD pipeline: GitHub Actions → ArgoCD → Kubernetes
+- [x] CI: GitHub Actions runs every test suite on push
+- [ ] CD: ArgoCD → Kubernetes
 - [ ] Monitoring: Prometheus + Grafana dashboards
 - [ ] Distributed tracing: Jaeger
 
