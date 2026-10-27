@@ -6,7 +6,7 @@ function requirePassword(): string {
   return process.env.DB_PASS;
 }
 
-// docker compose passes DATABASE_URL. outside docker the DB_* vars or local defaults are used
+// DATABASE_URL wins if set, otherwise the DB_* vars (docker compose passes DB_HOST and DB_PASS)
 export const dbOptions: PostgresConnectionOptions = process.env.DATABASE_URL
   ? { type: 'postgres', url: process.env.DATABASE_URL }
   : {
