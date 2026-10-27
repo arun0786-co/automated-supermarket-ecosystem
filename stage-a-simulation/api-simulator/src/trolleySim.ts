@@ -1,5 +1,6 @@
 import { PRODUCTS, Product, applyDynamicPricing } from './products';
 import { checkout } from './walletService';
+import { fuseScan } from './fusion';
 
 // trolley state. each field maps directly to what the jetson will publish over MQTT in stage B
 export interface Trolley {
@@ -80,8 +81,7 @@ export function startTrolleySimulation(broadcast: (data: unknown) => void) {
         t.totalWeight += weightDelta;
         t.cartTotal = +(t.cartTotal + price).toFixed(2);
 
-        // reject below 0.60 confidence, red LED on trolley in production
-        const accepted = confidence >= 0.60;
+        const { accepted } = fuseScan(product, confidence, weightDelta);
         broadcast({ type: 'SCAN_EVENT', trolleyId: t.id, userId: t.userId, event: { ...item, accepted } });
 
         // auto-checkout at 15 items, calls the mock blockchain checkout
