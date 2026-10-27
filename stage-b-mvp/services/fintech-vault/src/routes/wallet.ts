@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
-import { signer } from '../server';
+import { signer } from '../chain';
 import SPMTTokenABI from '../../artifacts/contracts/SPMTToken.sol/SPMTToken.json';
 
 const router = Router();
