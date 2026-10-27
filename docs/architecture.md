@@ -1,7 +1,7 @@
 # ASE-PRIME Architecture
 
 This document lives in `docs/` and covers the full system design as of Stage A.
-Diagrams are written in Mermaid — paste them into https://mermaid.live to render.
+Diagrams are written in Mermaid, paste them into https://mermaid.live to render.
 
 ---
 

@@ -1,4 +1,4 @@
-# API Reference — Stage A Simulator
+# API Reference: Stage A Simulator
 
 Base URL: `http://localhost:3001`
 WebSocket: `ws://localhost:3001`
@@ -71,7 +71,7 @@ Returns all user wallets and current $SPMT balances.
 ]
 ```
 
-**GET** `/api/wallets/:id` — Single wallet by userId.
+**GET** `/api/wallets/:id`: single wallet by userId.
 
 **POST** `/api/checkout`
 
