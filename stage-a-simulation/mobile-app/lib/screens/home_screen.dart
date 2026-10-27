@@ -127,8 +127,8 @@ class _CartItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // only accepted scans reach the cart, so every tile here passed fusion
     final confidence = (item['confidence'] as num).toDouble();
-    final ok = confidence >= 0.80;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -148,11 +148,8 @@ class _CartItemTile extends StatelessWidget {
                 style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
             ]),
           ),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${(item['price'] as num).toStringAsFixed(2)} SPMT',
-              style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.bold, fontSize: 13)),
-            Icon(ok ? Icons.check_circle : Icons.cancel, size: 14, color: ok ? const Color(0xFF4ADE80) : const Color(0xFFF87171)),
-          ]),
+          Text('${(item['price'] as num).toStringAsFixed(2)} SPMT',
+            style: const TextStyle(color: Color(0xFF4ADE80), fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
     );
