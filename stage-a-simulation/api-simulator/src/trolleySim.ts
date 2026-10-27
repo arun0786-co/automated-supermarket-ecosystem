@@ -73,8 +73,8 @@ export function startTrolleySimulation(broadcast: (data: unknown) => void) {
         // produce is harder for yolov8 to classify, so confidence baseline is lower
         const baseConf = product.category === 'Produce' ? 0.75 : 0.85;
         const confidence = +(baseConf + Math.random() * 0.14).toFixed(3);
-        // ±5% noise on the HX711 reading
-        const weightDelta = +(product.weight * (0.95 + Math.random() * 0.1)).toFixed(1);
+        // the load cells are precise to ±5g (chapter 2 of the spec)
+        const weightDelta = +(product.weight + (Math.random() - 0.5) * 10).toFixed(1);
 
         const item: CartItem = { sku: product.sku, name: product.name, confidence, weightDelta, price, discounted, ts: new Date().toISOString() };
         const { accepted } = fuseScan(product, confidence, weightDelta);
