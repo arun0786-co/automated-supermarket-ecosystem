@@ -17,11 +17,25 @@ contract SPMTToken is ERC20, Ownable {
     // current overdraft balances — how much each subscriber owes
     mapping(address => uint256) public overdraftOwed;
 
+    // the only contract allowed to call pay(). set once Checkout is deployed
+    address public checkoutContract;
+
     event SubscriberAdded(address indexed user, uint256 limit);
+    event CheckoutContractSet(address checkout);
     event OverdraftUsed(address indexed user, uint256 amount, uint256 totalOwed);
 
     constructor(address _storeWallet) ERC20("SupermarketToken", "SPMT") Ownable(msg.sender) {
         storeWallet = _storeWallet;
+    }
+
+    modifier onlyCheckout() {
+        require(msg.sender == checkoutContract, "only checkout contract");
+        _;
+    }
+
+    function setCheckout(address checkout) external onlyOwner {
+        checkoutContract = checkout;
+        emit CheckoutContractSet(checkout);
     }
 
     // mint is only called by the owner (store admin) when a customer tops up via fiat
@@ -39,7 +53,7 @@ contract SPMTToken is ERC20, Ownable {
 
     // checkout is called by the Checkout contract — not directly by customers
     // this function handles both normal payment and subscriber overdraft
-    function pay(address from, uint256 amount) external onlyOwner returns (bool) {
+    function pay(address from, uint256 amount) external onlyCheckout returns (bool) {
         uint256 balance = balanceOf(from);
         if (balance >= amount) {
             // normal case — enough tokens in wallet

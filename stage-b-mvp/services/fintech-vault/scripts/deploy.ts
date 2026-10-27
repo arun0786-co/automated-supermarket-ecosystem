@@ -20,6 +20,9 @@ async function main() {
   await checkout.waitForDeployment();
   console.log(`Checkout deployed:  ${await checkout.getAddress()}`);
 
+  // let the checkout contract move tokens, nothing else can call pay()
+  await (await token.setCheckout(await checkout.getAddress())).wait();
+
   // seed some SPMT balances for testing — 1 SPMT = 1 unit (18 decimals)
   const usersAndBalances: [string, number][] = [
     [deployer.address, 1000],  // arun — 1000 SPMT
