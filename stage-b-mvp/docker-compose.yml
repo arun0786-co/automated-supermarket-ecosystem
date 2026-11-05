@@ -6,8 +6,6 @@ services:
   # ── Service A: Product Core (Chapter 4) ─────────────────────
   product-core:
     build: ./services/product-core
-    ports:
-      - "3001:3001"
     environment:
       - DB_HOST=postgres
       - DB_PASS=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in stage-b-mvp/.env}
@@ -21,8 +19,6 @@ services:
   # ── Service B: Vision & Sensor Fusion (Chapter 5) ───────────
   vision:
     build: ./services/vision
-    ports:
-      - "8001:8001"
     environment:
       - PRODUCT_CORE_URL=http://product-core:3001
       - MODEL_PATH=/models/yolov8n.onnx
@@ -35,11 +31,8 @@ services:
   # ── Service C: Fintech Vault / Blockchain (Chapter 6) ───────
   fintech-vault:
     build: ./services/fintech-vault
-    ports:
-      - "3002:3002"
     environment:
       - CHAIN_RPC=http://hardhat-node:8545
-      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
     depends_on:
       hardhat-node:
         condition: service_healthy
@@ -47,8 +40,6 @@ services:
   # ── Service D: AI Recommendations (Chapter 7) ───────────────
   ai-engine:
     build: ./services/ai-engine
-    ports:
-      - "8000:8000"
     environment:
       - PRODUCT_CORE_URL=http://product-core:3001
       - STATE_PATH=/data/ai-state.json
@@ -71,22 +62,16 @@ services:
       test: ["CMD", "pg_isready", "-U", "ase", "-d", "ase_products"]
       interval: 2s
       retries: 30
-    ports:
-      - "5432:5432"
 
   redis:
     image: redis:7-alpine
     command: redis-server --save 60 1
-    ports:
-      - "6379:6379"
 
   # ── Local Blockchain (replaces Hyperledger Besu in dev) ─────
   hardhat-node:
     # same image as the vault so `hardhat node` runs inside the hardhat project
     build: ./services/fintech-vault
     command: ["npx", "hardhat", "node", "--hostname", "0.0.0.0"]
-    ports:
-      - "8545:8545"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8545',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_blockNumber'})}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 2s
@@ -121,8 +106,6 @@ services:
   # ── Fleet engine: carts, live feed, connects the services ───
   fleet-engine:
     build: ./services/fleet-engine
-    ports:
-      - "3003:3003"
     environment:
       - MQTT_URL=mqtt://mqtt-broker:1883
       - MQTT_FLEET_PASSWORD=${MQTT_FLEET_PASSWORD:?set MQTT_FLEET_PASSWORD in stage-b-mvp/.env}
@@ -155,12 +138,15 @@ services:
         condition: service_healthy
 
   # ── API Gateway ─────────────────────────────────────────────
+  # the only way in from outside, along with the broker for trolleys (chapter 10.1)
   gateway:
-    image: nginx:alpine
+    image: nginx:1.29-alpine
     ports:
       - "80:80"
     volumes:
-      - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx-protected.conf:/etc/nginx/nginx-protected.conf:ro
+      - ./config/nginx-admin.conf:/etc/nginx/nginx-admin.conf:ro
     depends_on:
       - product-core
       - vision

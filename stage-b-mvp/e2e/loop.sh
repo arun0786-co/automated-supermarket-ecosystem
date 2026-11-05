@@ -4,25 +4,23 @@
 # env: same as smoke.sh, and E2E_ENV_FILE so services can be stopped and started
 set -u
 
-GW=${GW:-http://localhost:80}
-WS=${WS:-ws://localhost:80/ws}
-CT='content-type: application/json'
 HERE=$(cd "$(dirname "$0")" && pwd)
-WORK=$(mktemp -d)
+# shellcheck source=e2e/lib.sh
+source "$HERE/lib.sh"
+WS=${WS:-ws://localhost:80/ws}
 FEED="$WORK/feed.ndjson"
-touch "$FEED"
-passed=0
-failed=0
+CUSTOMER_FEED="$WORK/customer-feed.ndjson"
+touch "$FEED" "$CUSTOMER_FEED"
 
-compose() { docker compose -p "${E2E_PROJECT:-ase-e2e}" --env-file "$E2E_ENV_FILE" "$@"; }
+ADMIN=$(login admin@ase.local "$ADMIN_PASSWORD")
+ARUN=$(login arun@ase.local "$DEMO_PASSWORD")
+TOKEN=$ADMIN
 
-node "$HERE/record-feed.mjs" "$WS" "$FEED" &
+node "$HERE/record-feed.mjs" "$WS?token=$ADMIN" "$FEED" &
 RECORDER=$!
-trap 'kill "$RECORDER" 2>/dev/null; rm -rf "$WORK"' EXIT
-
-ok()   { passed=$((passed + 1)); printf 'ok    %s\n' "$1"; }
-nope() { failed=$((failed + 1)); printf 'FAIL  %s\n' "$1"; }
-json() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
+node "$HERE/record-feed.mjs" "$WS?token=$ARUN" "$CUSTOMER_FEED" &
+CUSTOMER_RECORDER=$!
+trap 'kill "$RECORDER" "$CUSTOMER_RECORDER" 2>/dev/null; rm -rf "$WORK"' EXIT
 
 # counts feed events after a line number that match a python condition on the event e
 feed_count() {
@@ -59,7 +57,7 @@ wait_event() {
 
 lines() { wc -l < "$FEED" | tr -d ' '; }
 
-stock_total() { curl -s "$GW/api/products" | json "sum(p['stockLevel'] for p in d)"; }
+stock_total() { api "$GW/api/products" | json "sum(p['stockLevel'] for p in d)"; }
 
 wait_ok() {
   local i
@@ -91,19 +89,38 @@ for line in open(sys.argv[1]):
         break
 EOF
 )
-if [ -n "$hash" ] && curl -s "$GW/api/ledger?limit=100" | grep -q "$hash"; then ok 'the checkout hash is in the on-chain ledger'; else nope "checkout hash [$hash] missing from the ledger"; fi
+if [ -n "$hash" ] && api "$GW/api/ledger?limit=100" | grep -q "$hash"; then ok 'the checkout hash is in the on-chain ledger'; else nope "checkout hash [$hash] missing from the ledger"; fi
 
 stock_after=$(stock_total)
 if [ "$stock_after" -lt "$stock_before" ]; then ok "stock went down ($stock_before to $stock_after)"; else nope "stock did not go down ($stock_before to $stock_after)"; fi
 
-wallets=$(curl -s "$GW/api/wallets")
+wallets=$(api "$GW/api/wallets")
 if [ "$(echo "$wallets" | json 'len(d)')" = "3" ]; then ok 'three customer wallets'; else nope "wallets: $wallets"; fi
 if [ "$(echo "$wallets" | json "sorted(d[0])")" = "['balance', 'isSubscriber', 'name', 'overdraftLimit', 'userId']" ]; then ok 'wallets keep the stage A shape'; else nope "wallet shape: $wallets"; fi
 paid=$(echo "$wallets" | json "sum(1 for w in d if w['balance'] < {'USR-001': 105.5, 'USR-002': 67, 'USR-003': 210.75}.get(w['userId'], 0))")
 if [ "$paid" -gt 0 ]; then ok 'a customer balance went down'; else nope "no balance moved: $wallets"; fi
 
-trained=$(curl -s "$GW/api/recommendations/model")
+trained=$(api "$GW/api/recommendations/model")
 if [ "$(echo "$trained" | json 'd["feedbackEvents"] > 0')" = "True" ]; then ok 'the bandit receives rewards from real scans'; else nope "no feedback events: $trained"; fi
+
+echo '== customers only see their own shopping'
+others=$(python3 - "$CUSTOMER_FEED" <<'PY'
+import json, sys
+leaks = seen = 0
+for line in open(sys.argv[1]):
+    e = json.loads(line)
+    if e["type"] == "TROLLEY_POSITIONS":
+        leaks += sum(1 for t in e["data"] if t["userId"] != "USR-001")
+        seen += len(e["data"])
+    elif e["type"] in ("SCAN_EVENT", "CHECKOUT_EVENT", "RECOMMENDATION_EVENT"):
+        leaks += e["userId"] != "USR-001"
+        seen += 1
+print(leaks, seen)
+PY
+)
+expect 'nothing from other customers reached them' 0 "${others% *}"
+if [ "${others#* }" -gt 0 ]; then ok 'but their own events did'; else nope 'the customer feed was empty'; fi
+if [ "$(feed_count "e['type'] == 'SCAN_EVENT' and e['userId'] != 'USR-001'")" -gt 0 ]; then ok 'an admin sees everyone'; else nope 'the admin feed only had one customer'; fi
 
 echo '== vision goes down'
 compose stop vision > /dev/null 2>&1
@@ -117,15 +134,15 @@ wait_event 'scans are accepted again once it is back' 60 "e['type'] == 'SCAN_EVE
 echo '== the fleet engine restarts mid shop'
 compose stop trolley-sim > /dev/null 2>&1
 sleep 8 # let any in-flight scan and checkout reset settle
-before=$(curl -s "$GW/api/fleet/trolleys" | json "sorted((t['id'], t['itemCount'], t['cartTotal']) for t in d)")
+before=$(api "$GW/api/fleet/trolleys" | json "sorted((t['id'], t['itemCount'], t['cartTotal']) for t in d)")
 charges_before=$(feed_count "e['type'] == 'CHECKOUT_EVENT' and e['ok']")
-ledger_before=$(curl -s "$GW/api/ledger?limit=100" | json "len(d['transactions'])")
+ledger_before=$(api "$GW/api/ledger?limit=100" | json "len(d['transactions'])")
 compose restart fleet-engine > /dev/null 2>&1
 wait_ok "$GW/health/fleet" || nope 'fleet engine did not come back'
-after=$(curl -s "$GW/api/fleet/trolleys" | json "sorted((t['id'], t['itemCount'], t['cartTotal']) for t in d)")
+after=$(api "$GW/api/fleet/trolleys" | json "sorted((t['id'], t['itemCount'], t['cartTotal']) for t in d)")
 if [ "$before" = "$after" ]; then ok 'every cart survived the restart'; else nope "carts changed: $before then $after"; fi
 sleep 2
-ledger_after=$(curl -s "$GW/api/ledger?limit=100" | json "len(d['transactions'])")
+ledger_after=$(api "$GW/api/ledger?limit=100" | json "len(d['transactions'])")
 if [ "$ledger_before" = "$ledger_after" ]; then ok 'nothing was charged again'; else nope "ledger went from $ledger_before to $ledger_after"; fi
 compose start trolley-sim > /dev/null 2>&1
 mark=$(lines)
@@ -134,17 +151,21 @@ wait_event 'scans flow again after the restart' 60 "e['type'] == 'SCAN_EVENT'" "
 echo '== redis goes down'
 compose stop trolley-sim > /dev/null 2>&1
 sleep 3
-stock_sku() { curl -s "$GW/api/products/$1" | json "d['stockLevel']"; }
+stock_sku() { api "$GW/api/products/$1" | json "d['stockLevel']"; }
 s0=$(stock_sku PNT-004)
 compose stop redis > /dev/null 2>&1
-code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST -H "$CT" -d '{"quantity":1}' "$GW/api/products/PNT-004/pick")
+code=$(api -m 10 -o /dev/null -w '%{http_code}' -X POST -H "$CT" -d '{"quantity":1}' "$GW/api/products/PNT-004/pick")
 if [ "$code" = "201" ]; then ok 'picks fall back to postgres'; else nope "pick with redis down returned $code"; fi
 if [ "$(stock_sku PNT-004)" = "$((s0 - 1))" ]; then ok 'the catalog stays right without redis'; else nope 'catalog wrong with redis down'; fi
 compose start redis > /dev/null 2>&1
 sleep 3
-code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST -H "$CT" -d '{"quantity":1}' "$GW/api/products/PNT-004/pick")
+code=$(api -m 10 -o /dev/null -w '%{http_code}' -X POST -H "$CT" -d '{"quantity":1}' "$GW/api/products/PNT-004/pick")
 if [ "$code" = "201" ] && [ "$(stock_sku PNT-004)" = "$((s0 - 2))" ]; then ok 'no pick was lost or counted twice across the outage'; else nope "after the outage: $code, stock $(stock_sku PNT-004), wanted $((s0 - 2))"; fi
 
-echo
-echo "$passed passed, $failed failed"
-[ "$failed" -eq 0 ]
+echo '== password guessing'
+seq 1 60 | xargs -P 20 -I{} curl -s -m 30 -o /dev/null -w '%{http_code}\n' -X POST -H "$CT" \
+  -d '{"email":"arun@ase.local","password":"guess guess"}' "$GW/api/auth/login" > "$WORK/guesses"
+limited=$(grep -c '^429$' "$WORK/guesses")
+if [ "$limited" -gt 20 ]; then ok "the gateway stops it ($limited of 60 were limited)"; else nope "only $limited of 60 guesses were limited"; fi
+
+summary
