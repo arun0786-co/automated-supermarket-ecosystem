@@ -31,6 +31,12 @@ fi
 
 compose() { docker compose -p ase-e2e --env-file "$ENV_FILE" "$@"; }
 
+# the tls overlay needs a certificate. reuses one if make stage-b-env already made it
+[ "${E2E_OVERLAY:-}" = "tls" ] && [ ! -f certs/tls.crt ] && {
+  mkdir -p certs
+  openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=localhost" -keyout certs/tls.key -out certs/tls.crt > /dev/null 2>&1
+}
+
 finish() {
   if [ "${KEEP:-0}" = "1" ]; then
     echo "stack left running: docker compose -p ase-e2e --env-file $ENV_FILE ..."
