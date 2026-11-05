@@ -10,13 +10,15 @@ from fastapi.concurrency import run_in_threadpool
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field, StringConstraints
 
-from detector import COCO_TO_SKU, FrameError, OnnxDetector, crop_roi, decode_frame
+from detector import FrameError, OnnxDetector, crop_roi, decode_frame, load_labels, sku_for
 from fusion import aggregate_burst, fuse
 
 log = logging.getLogger("vision")
 
 PRODUCT_CORE_URL = os.environ.get("PRODUCT_CORE_URL", "http://product-core:3001")
 MODEL_PATH = os.environ.get("MODEL_PATH", "/models/yolov8n.onnx")
+# only for a model trained on store images: its class names, which are skus
+LABELS_PATH = os.environ.get("LABELS_PATH", "/models/labels.json")
 # region of the camera view that covers the basket, as fractions of the frame
 ROI = tuple(float(v) for v in os.environ.get("VISION_ROI", "0,0,1,1").split(","))
 
@@ -38,7 +40,8 @@ MAX_FRAME_BASE64 = 4_000_000
 async def lifespan(app: FastAPI):
     # the service still runs without weights so simulated trolleys can use the fusion step.
     # real frames get a 503 instead of a made up answer
-    app.state.detector = OnnxDetector(MODEL_PATH) if os.path.exists(MODEL_PATH) else None
+    labels = load_labels(LABELS_PATH) if os.path.exists(LABELS_PATH) else None
+    app.state.detector = OnnxDetector(MODEL_PATH, labels) if os.path.exists(MODEL_PATH) else None
     log.warning("vision model %s", "loaded" if app.state.detector else f"not found at {MODEL_PATH}")
     yield
 
@@ -114,7 +117,7 @@ async def scan(req: ScanRequest) -> ScanResponse:
         if burst is None:
             return rejected(None, 0.0, "no detection", source)
         name, confidence = burst
-        sku = COCO_TO_SKU.get(name)
+        sku = sku_for(name, getattr(app.state.detector, "trained_on_store", False))
         if sku is None:
             return rejected(None, confidence, "unknown item", source)
     elif req.detection:

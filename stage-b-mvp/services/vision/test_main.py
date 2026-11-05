@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import main
-from detector import FrameError, OnnxDetector, best_score_per_class, crop_roi, decode_frame, preprocess
+from detector import FrameError, OnnxDetector, best_score_per_class, crop_roi, decode_frame, load_labels, model_input_size, preprocess, sku_for
 
 
 def encoded_frame(size=(32, 24)) -> str:
@@ -179,3 +179,53 @@ def test_confidence_reaches_the_metrics(client):
     body = client.get("/metrics").text
     assert 'ase_vision_confidence_count{source="simulated"}' in body
     assert 'ase_vision_scans_total{accepted="true",source="simulated"}' in body
+
+
+def test_a_store_trained_model_names_its_classes_by_sku(client):
+    detector = StubDetector(*[{"PNT-001": 0.9}] * 5)
+    detector.trained_on_store = True
+    main.app.state.detector = detector
+    body = burst(client, delta=450).json()
+    assert body["sku"] == "PNT-001"
+    assert body["accepted"] is True
+
+
+def test_a_store_model_class_missing_from_the_catalog_is_unknown(client):
+    detector = StubDetector(*[{"SKU-RETIRED": 0.9}] * 5)
+    detector.trained_on_store = True
+    main.app.state.detector = detector
+    assert burst(client).json()["reason"] == "unknown item"
+
+
+def test_scores_use_the_models_own_labels():
+    raw = np.zeros((1, 6, 2), dtype=np.float32)
+    raw[0, 4 + 1, :] = [0.1, 0.8]
+    assert best_score_per_class(raw, ["PRD-001", "PNT-001"]) == {"PNT-001": pytest.approx(0.8)}
+
+
+def test_sku_lookup_for_each_kind_of_model():
+    assert sku_for("banana", trained_on_store=False) == "PRD-001"
+    assert sku_for("teddy bear", trained_on_store=False) is None
+    assert sku_for("PNT-001", trained_on_store=True) == "PNT-001"
+
+
+def test_labels_file_is_checked(tmp_path):
+    good = tmp_path / "good.json"
+    good.write_text('["PRD-001", "PNT-001"]')
+    assert load_labels(str(good)) == ["PRD-001", "PNT-001"]
+    for content in ['{"a": 1}', "[]", "[1, 2]"]:
+        bad = tmp_path / "bad.json"
+        bad.write_text(content)
+        with pytest.raises(ValueError):
+            load_labels(str(bad))
+
+
+def test_the_input_size_comes_from_the_model():
+    assert model_input_size([1, 3, 160, 160]) == 160
+    assert model_input_size([1, 3, 640, 640]) == 640
+    # exports with an open size name the dimension instead of fixing it
+    assert model_input_size(["batch", 3, "height", "width"]) == 640
+
+
+def test_preprocess_fits_whatever_size_the_model_wants():
+    assert preprocess(Image.new("RGB", (1280, 720)), 160).shape == (1, 3, 160, 160)
