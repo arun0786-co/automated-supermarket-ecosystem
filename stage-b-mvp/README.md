@@ -80,4 +80,4 @@ cd services/ai-engine && pip install -r requirements-dev.txt && python -m pytest
 
 ## What You Need to Install First
 - Docker with Compose
-- Node.js 20+ and Python 3.11+ to run the tests outside Docker
+- Node.js 22.13+ and Python 3.11+ to run the tests outside Docker
