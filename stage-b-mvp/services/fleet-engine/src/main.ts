@@ -1,9 +1,9 @@
-import { createServer, IncomingMessage } from 'node:http';
-import cors from 'cors';
-import express from 'express';
+import { createServer } from 'node:http';
 import mqtt from 'mqtt';
-import { WebSocket, WebSocketServer } from 'ws';
+import { WebSocketServer } from 'ws';
+import { createApi } from './api';
 import { FleetEngine } from './engine';
+import { Feed, TOKEN_EXPIRED, viewerFromHeaders } from './feed';
 import { fetchCustomers, fetchWallet, httpServices } from './http-services';
 import { MemoryCartStore, RedisCartStore } from './store';
 
@@ -22,14 +22,7 @@ const urls = {
 };
 const POSITIONS_EVERY_MS = 800;
 
-const clients = new Set<WebSocket>();
-
-function broadcast(message: unknown) {
-  const text = JSON.stringify(message);
-  for (const client of clients) {
-    if (client.readyState === WebSocket.OPEN) client.send(text);
-  }
-}
+const feed = new Feed();
 
 async function main() {
   const broker = mqtt.connect(process.env.MQTT_URL || 'mqtt://mqtt-broker:1883', {
@@ -45,7 +38,7 @@ async function main() {
   const engine = new FleetEngine({
     services,
     store: process.env.REDIS_URL ? new RedisCartStore(process.env.REDIS_URL) : new MemoryCartStore(),
-    broadcast,
+    broadcast: (message) => feed.broadcast(message as { type: string }),
     publish: (topic, payload) => {
       broker.publish(topic, JSON.stringify(payload), { qos: 1 }, (err) => {
         if (err) console.warn(`could not publish to ${topic}: ${err.message}`);
@@ -70,55 +63,27 @@ async function main() {
   broker.on('error', (err) => console.warn(`mqtt error: ${err.message}`));
   broker.on('message', (topic, payload) => void restored.then(() => engine.handleMessage(topic, payload)));
 
-  const app = express();
-  app.use(cors());
-
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'fleet-engine', stage: 'B', brokerConnected: broker.connected, subscribed, trolleys: engine.snapshot().length, clients: clients.size });
-  });
-
-  app.get('/api/fleet/trolleys', (_req, res) => {
-    res.json(engine.snapshot());
-  });
-
-  app.get('/api/fleet/cart/:userId', (req, res) => {
-    res.json(engine.cartFor(req.params.userId) ?? { trolleyId: null, status: 'IDLE', items: [], total: 0 });
-  });
-
-  app.get('/api/wallets', async (_req, res) => {
-    try {
-      const customers = await fetchCustomers(urls);
-      res.json(await Promise.all(customers.map((user) => fetchWallet(urls, user))));
-    } catch (err) {
-      console.warn(`wallet list failed: ${String(err)}`);
-      res.status(503).json({ error: 'wallets unavailable' });
-    }
-  });
-
-  app.get('/api/wallets/:id', async (req, res) => {
-    try {
-      const user = await services.getUser(req.params.id);
-      if (!user) {
-        res.status(404).json({ error: 'wallet not found' });
-        return;
-      }
-      res.json(await fetchWallet(urls, user));
-    } catch (err) {
-      console.warn(`wallet lookup failed: ${String(err)}`);
-      res.status(503).json({ error: 'wallet unavailable' });
-    }
+  const app = createApi({
+    health: () => ({ status: 'ok', service: 'fleet-engine', stage: 'B', brokerConnected: broker.connected, subscribed, trolleys: engine.snapshot().length, clients: feed.size() }),
+    snapshot: () => engine.snapshot(),
+    cartFor: (id) => engine.cartFor(id),
+    getUser: (id) => services.getUser(id),
+    listCustomers: () => fetchCustomers(urls),
+    walletOf: (user) => fetchWallet(urls, user),
   });
 
   const server = createServer(app);
   const wss = new WebSocketServer({ server });
-  wss.on('connection', (socket: WebSocket, _req: IncomingMessage) => {
-    clients.add(socket);
-    socket.on('close', () => clients.delete(socket));
-    socket.on('error', () => clients.delete(socket));
-    socket.send(JSON.stringify({ type: 'INFO', message: 'connected to ASE fleet engine' }));
+  wss.on('connection', (socket, req) => {
+    const viewer = viewerFromHeaders(req.headers);
+    if (!viewer) {
+      socket.close(TOKEN_EXPIRED, 'not logged in');
+      return;
+    }
+    feed.add(socket, viewer);
   });
 
-  setInterval(() => broadcast({ type: 'TROLLEY_POSITIONS', data: engine.snapshot() }), POSITIONS_EVERY_MS).unref();
+  setInterval(() => feed.broadcast({ type: 'TROLLEY_POSITIONS', data: engine.snapshot() }), POSITIONS_EVERY_MS).unref();
 
   const port = Number(process.env.PORT || 3003);
   server.listen(port, () => console.log(`fleet-engine on port ${port}`));
