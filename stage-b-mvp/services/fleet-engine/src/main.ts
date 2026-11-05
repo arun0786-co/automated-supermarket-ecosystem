@@ -5,6 +5,7 @@ import { createApi } from './api';
 import { FleetEngine } from './engine';
 import { Feed, TOKEN_EXPIRED, viewerFromHeaders } from './feed';
 import { fetchCustomers, fetchWallet, httpServices } from './http-services';
+import { createMetrics } from './metrics';
 import { MemoryCartStore, RedisCartStore } from './store';
 
 function required(name: string): string {
@@ -35,8 +36,12 @@ async function main() {
   });
 
   const services = httpServices(urls);
+  // set just below. the metrics read the engine, the engine reports to the metrics
+  let snapshot: () => { itemCount: number }[] = () => [];
+  const metrics = createMetrics(() => snapshot());
   const engine = new FleetEngine({
     services,
+    metrics,
     store: process.env.REDIS_URL ? new RedisCartStore(process.env.REDIS_URL) : new MemoryCartStore(),
     broadcast: (message) => feed.broadcast(message as { type: string }),
     publish: (topic, payload) => {
@@ -45,6 +50,7 @@ async function main() {
       });
     },
   });
+  snapshot = () => engine.snapshot();
 
   // attached before anything async: the broker can connect at any moment. messages wait for the
   // restore, so a redelivered scan is checked against the restored cart
@@ -70,6 +76,7 @@ async function main() {
     getUser: (id) => services.getUser(id),
     listCustomers: () => fetchCustomers(urls),
     walletOf: (user) => fetchWallet(urls, user),
+    metrics: async () => ({ contentType: metrics.registry.contentType, body: await metrics.registry.metrics() }),
   });
 
   const server = createServer(app);

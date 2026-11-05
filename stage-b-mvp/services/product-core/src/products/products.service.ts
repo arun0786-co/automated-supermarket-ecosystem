@@ -13,6 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './product.entity';
 import { HOT_STOCK, HotStock } from './hot-stock';
+import { hotStockDegraded, picks } from '../metrics.controller';
 
 const FLUSH_INTERVAL_MS = 200;
 
@@ -31,6 +32,7 @@ export class ProductsService implements OnApplicationBootstrap, OnApplicationShu
   ) {}
 
   async onApplicationBootstrap() {
+    hotStockDegraded.set(0);
     if (!this.hot) return;
     await this.seedHotStock().catch((err) => this.markDegraded(err));
     this.flushTimer = setInterval(() => void this.flushHotStock(), FLUSH_INTERVAL_MS);
@@ -46,6 +48,7 @@ export class ProductsService implements OnApplicationBootstrap, OnApplicationShu
   private markDegraded(err: unknown) {
     if (!this.degraded) this.logger.warn(`hot stock unavailable, using postgres: ${String(err)}`);
     this.degraded = true;
+    hotStockDegraded.set(1);
   }
 
   // SETNX underneath, so a service restart keeps the live counts
@@ -119,14 +122,27 @@ export class ProductsService implements OnApplicationBootstrap, OnApplicationShu
           await this.hot.seed(sku, (await this.loadRow(sku)).stockLevel);
           result = await this.hot.take(sku, quantity);
         }
-        if (result.status === 'ok') return result.stock;
-        if (result.status === 'insufficient') throw new ConflictException(`only ${result.stock} of ${sku} left`);
+        if (result.status === 'ok') {
+          picks.inc({ path: 'redis', outcome: 'ok' });
+          return result.stock;
+        }
+        if (result.status === 'insufficient') {
+          picks.inc({ path: 'redis', outcome: 'out_of_stock' });
+          throw new ConflictException(`only ${result.stock} of ${sku} left`);
+        }
       } catch (err) {
         if (err instanceof HttpException) throw err;
         this.markDegraded(err);
       }
     }
-    return this.changeInPostgres(sku, -quantity, maxAttempts);
+    try {
+      const stock = await this.changeInPostgres(sku, -quantity, maxAttempts);
+      picks.inc({ path: 'postgres', outcome: 'ok' });
+      return stock;
+    } catch (err) {
+      picks.inc({ path: 'postgres', outcome: err instanceof ConflictException ? 'out_of_stock' : 'error' });
+      throw err;
+    }
   }
 
   // puts stock back, e.g. when a checkout fails and the customer returns the goods
@@ -207,6 +223,7 @@ export class ProductsService implements OnApplicationBootstrap, OnApplicationShu
       if (stockLevel !== p.stockLevel) await this.repo.update({ sku: p.sku }, { stockLevel });
     }
     this.degraded = false;
+    hotStockDegraded.set(0);
     this.logger.log('hot stock reconciled with postgres');
   }
 }

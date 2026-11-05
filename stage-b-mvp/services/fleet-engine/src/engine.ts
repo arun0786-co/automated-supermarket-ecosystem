@@ -1,3 +1,5 @@
+import { SpanStatusCode, trace } from '@opentelemetry/api';
+import { EngineMetrics } from './metrics';
 import { Cart, CartItem, CartStore, ChargeResult, ChargeUnknownError, Product, RecommendationContext, Services, VisionRequest } from './types';
 
 // same rule as stage A: the cart checks out by itself at 15 items
@@ -19,7 +21,11 @@ type Options = {
   publish: (topic: string, payload: unknown) => void;
   schedule?: (fn: () => void, ms: number) => void;
   log?: (message: string) => void;
+  metrics?: EngineMetrics;
 };
+
+// does nothing unless the tracing setup has been loaded
+const tracer = trace.getTracer('fleet-engine');
 
 type Position = { x: number; y: number };
 
@@ -64,6 +70,7 @@ export class FleetEngine {
   private readonly publish: Options['publish'];
   private readonly schedule: NonNullable<Options['schedule']>;
   private readonly log: NonNullable<Options['log']>;
+  private readonly metrics?: EngineMetrics;
 
   constructor(options: Options) {
     this.services = options.services;
@@ -72,6 +79,7 @@ export class FleetEngine {
     this.publish = options.publish;
     this.schedule = options.schedule ?? ((fn, ms) => void setTimeout(fn, ms).unref());
     this.log = options.log ?? console.warn;
+    this.metrics = options.metrics;
   }
 
   // keeping carts durable matters, but not more than keeping the shop open
@@ -122,7 +130,18 @@ export class FleetEngine {
           this.log(`dropped malformed scan from ${trolleyId}`);
           return;
         }
-        await this.enqueue(trolleyId, () => this.handleScan(trolleyId, scan));
+        await tracer.startActiveSpan('scan', async (span) => {
+          span.setAttribute('ase.trolley', trolleyId);
+          span.setAttribute('ase.event', scan.eventId);
+          try {
+            await this.enqueue(trolleyId, () => this.handleScan(trolleyId, scan));
+          } catch (err) {
+            span.setStatus({ code: SpanStatusCode.ERROR, message: String(err) });
+            throw err;
+          } finally {
+            span.end();
+          }
+        });
       }
     } catch (err) {
       this.log(`error handling ${kind} from ${trolleyId}: ${String(err)}`);
@@ -204,6 +223,7 @@ export class FleetEngine {
     this.remember(cart, scan.eventId);
     await this.saveCart(cart);
 
+    this.metrics?.scan('accepted');
     this.broadcast({ type: 'SCAN_EVENT', trolleyId, userId: cart.userId, event: { ...item, accepted: true } });
     this.publish(`trolley/${trolleyId}/led`, { color: 'green' });
     await this.noteStockChange(product, stockLevel);
@@ -224,6 +244,7 @@ export class FleetEngine {
   private async reject(cart: Cart, scan: VisionRequest, reason: string, sku?: string | null, confidence?: number) {
     // undefined: rejected before vision ran, so show what the camera claimed.
     // null: vision ran and couldn't name anything
+    this.metrics?.scan(reason);
     const claimed = sku === undefined ? (scan.detection?.sku ?? null) : sku;
     let shown: Pick<CartItem, 'sku' | 'name' | 'emoji' | 'price' | 'discounted'> = unknownProduct(claimed);
     if (claimed) {
@@ -310,6 +331,8 @@ export class FleetEngine {
 
     const skus = cart.items.map((item) => item.sku);
     const total = cart.cartTotal;
+    const started = process.hrtime.bigint();
+    const elapsed = () => Number(process.hrtime.bigint() - started) / 1e9;
     let result: ChargeResult;
     try {
       const user = await this.services.getUser(cart.userId);
@@ -321,6 +344,7 @@ export class FleetEngine {
     } catch (err) {
       if (err instanceof ChargeUnknownError) {
         this.log(`charge outcome unknown for ${cart.trolleyId}: ${err.message}`);
+        this.metrics?.checkout('unknown', elapsed());
         this.settleUnknownCheckout(cart);
         return;
       }
@@ -328,6 +352,7 @@ export class FleetEngine {
       result = { ok: false, reason: 'payment service unavailable' };
     }
 
+    this.metrics?.checkout(result.ok ? 'paid' : 'refused', elapsed());
     if (result.ok) {
       void this.services.recordPurchase(skus).catch((err) => this.log(`could not record purchase: ${String(err)}`));
     } else {

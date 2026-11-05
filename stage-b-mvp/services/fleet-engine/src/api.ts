@@ -8,6 +8,7 @@ type Deps = {
   getUser: (id: string) => Promise<User | null>;
   listCustomers: () => Promise<User[]>;
   walletOf: (user: User) => Promise<unknown>;
+  metrics: () => Promise<{ contentType: string; body: string }>;
 };
 
 // identity comes from the gateway, which has verified the token. this service isn't published
@@ -45,6 +46,12 @@ export function createApi(deps: Deps) {
 
   app.get('/api/health', (_req, res) => {
     res.json(deps.health());
+  });
+
+  // scraped by prometheus. the gateway has no route to this
+  app.get('/metrics', async (_req, res) => {
+    const { contentType, body } = await deps.metrics();
+    res.type(contentType).send(body);
   });
 
   app.get('/api/fleet/trolleys', requireIdentity, requireAdmin, (_req, res) => {

@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: fleet-engine
+    static_configs:
+      - targets: ["fleet-engine:3003"]
+
+  - job_name: vision
+    static_configs:
+      - targets: ["vision:8001"]
+
+  - job_name: product-core
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["product-core:3001"]

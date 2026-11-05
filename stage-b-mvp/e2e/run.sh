@@ -9,6 +9,7 @@ ENV_FILE=$(mktemp)
 chmod 600 "$ENV_FILE"
 export E2E_ENV_FILE=$ENV_FILE
 export DEMO_PASSWORD=$(openssl rand -hex 16)
+export GRAFANA_PASSWORD=$(openssl rand -hex 16)
 export ADMIN_PASSWORD=$(openssl rand -hex 16)
 {
   echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
@@ -19,7 +20,13 @@ export ADMIN_PASSWORD=$(openssl rand -hex 16)
   echo "ADMIN_PASSWORD=$ADMIN_PASSWORD"
   # far faster than a real shop, so a cart fills up within the test
   echo "SCAN_PROBABILITY=0.6"
+  echo "GRAFANA_PASSWORD=$GRAFANA_PASSWORD"
 } > "$ENV_FILE"
+
+# E2E_OVERLAY=observability also starts docker-compose.observability.yml and runs its checks
+if [ -n "${E2E_OVERLAY:-}" ]; then
+  export COMPOSE_FILE="docker-compose.yml:docker-compose.$E2E_OVERLAY.yml"
+fi
 
 compose() { docker compose -p ase-e2e --env-file "$ENV_FILE" "$@"; }
 
@@ -46,6 +53,10 @@ status=$?
 if [ "$status" -eq 0 ]; then
   compose up -d --no-deps --scale trolley-sim=1 trolley-sim
   bash e2e/loop.sh
+  status=$?
+fi
+if [ "$status" -eq 0 ] && [ -f "e2e/${E2E_OVERLAY:-none}.sh" ]; then
+  bash "e2e/$E2E_OVERLAY.sh"
   status=$?
 fi
 # a real browser against the real stack. E2E_BROWSER=0 skips it, the image is large

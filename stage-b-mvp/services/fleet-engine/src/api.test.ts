@@ -24,6 +24,7 @@ before(async () => {
       if (vaultDown) throw new Error('vault is down');
       return { userId: user.id, name: user.name, balance: 1, overdraftLimit: 0, isSubscriber: false };
     },
+    metrics: async () => ({ contentType: 'text/plain; version=0.0.4', body: 'ase_active_carts 1\n' }),
   });
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => resolve());
@@ -95,4 +96,10 @@ test('a vault outage is a 503, not a crash', async () => {
 
 test('health needs no identity', async () => {
   assert.equal((await get('/api/health')).status, 200);
+});
+
+test('metrics are plain text for prometheus', async () => {
+  const res = await get('/metrics');
+  assert.match(res.headers.get('content-type') ?? '', /text\/plain/);
+  assert.equal(await res.text(), 'ase_active_carts 1\n');
 });

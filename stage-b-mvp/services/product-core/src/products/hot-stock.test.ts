@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { HotStock, TakeResult } from './hot-stock';
+import { registry } from '../metrics.controller';
 
 // behaves like the redis script: one at a time, nothing interleaves inside a call
 class FakeHotStock implements HotStock {
@@ -199,6 +200,23 @@ test('the catalog still answers with redis down', async () => {
   hot.down = true;
   assert.equal((await service.getAllWithPricing())[0].stockLevel, 11);
   assert.equal((await service.findBySku('PRD-001')).stockLevel, 11);
+});
+
+test('picks and redis health show up in the metrics', async () => {
+  const { service, hot } = setup({ 'PRD-001': 10 });
+  await service.seedHotStock();
+  await service.pick('PRD-001');
+  assert.match(await registry.metrics(), /ase_picks_total\{path="redis",outcome="ok"\} \d+/);
+
+  hot.down = true;
+  await service.pick('PRD-001');
+  const during = await registry.metrics();
+  assert.match(during, /ase_picks_total\{path="postgres",outcome="ok"\} \d+/);
+  assert.match(during, /ase_hot_stock_degraded 1/);
+
+  hot.down = false;
+  await service.flushHotStock();
+  assert.match(await registry.metrics(), /ase_hot_stock_degraded 0/);
 });
 
 test('release puts stock back', async () => {

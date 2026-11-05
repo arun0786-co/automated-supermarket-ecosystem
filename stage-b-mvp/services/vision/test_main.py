@@ -172,3 +172,10 @@ PHOTO = os.environ.get("TEST_PHOTO", "")
 def test_real_model_on_a_real_photo():
     scores = OnnxDetector(MODEL).detect(Image.open(PHOTO).convert("RGB"))
     assert max(scores, key=lambda c: scores[c]) == "banana"
+
+
+def test_confidence_reaches_the_metrics(client):
+    client.post("/api/vision/scan", json={"weightDelta": 450, "detection": {"sku": "PNT-001", "confidence": 0.85}})
+    body = client.get("/metrics").text
+    assert 'ase_vision_confidence_count{source="simulated"}' in body
+    assert 'ase_vision_scans_total{accepted="true",source="simulated"}' in body

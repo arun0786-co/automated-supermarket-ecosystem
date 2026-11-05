@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Literal, Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.concurrency import run_in_threadpool
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field, StringConstraints
 
 from detector import COCO_TO_SKU, FrameError, OnnxDetector, crop_roi, decode_frame
@@ -18,6 +19,15 @@ PRODUCT_CORE_URL = os.environ.get("PRODUCT_CORE_URL", "http://product-core:3001"
 MODEL_PATH = os.environ.get("MODEL_PATH", "/models/yolov8n.onnx")
 # region of the camera view that covers the basket, as fractions of the frame
 ROI = tuple(float(v) for v in os.environ.get("VISION_ROI", "0,0,1,1").split(","))
+
+# chapter 11.2: "Vision Model Confidence"
+CONFIDENCE = Histogram(
+    "ase_vision_confidence",
+    "Confidence of the detection behind each scan",
+    ["source"],
+    buckets=[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0],
+)
+RESULTS = Counter("ase_vision_scans_total", "Fusion decisions", ["source", "accepted"])
 
 # chapter 5.3: the camera grabs a burst of 5 frames
 MAX_FRAMES = 5
@@ -80,6 +90,12 @@ def run_burst(frames: list[str]) -> Optional[tuple[str, float]]:
     return aggregate_burst([detector.detect(image) for image in images])
 
 
+# scraped by prometheus. the gateway only routes /api/vision here
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "vision", "stage": "B", "modelLoaded": app.state.detector is not None}
@@ -117,6 +133,8 @@ async def scan(req: ScanRequest) -> ScanResponse:
         return rejected(sku, confidence, "unknown item", source)
 
     result = fuse(confidence, req.weightDelta, weight)
+    CONFIDENCE.labels(source).observe(confidence)
+    RESULTS.labels(source, str(result.accepted).lower()).inc()
     return ScanResponse(
         sku=sku,
         confidence=confidence,

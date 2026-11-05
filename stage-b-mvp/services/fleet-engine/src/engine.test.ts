@@ -481,6 +481,54 @@ test('a hanging ai engine does not hold up the next scan', async () => {
   assert.equal(ctx.engine.snapshot()[0].itemCount, 2);
 });
 
+test('scans and checkouts are counted', async () => {
+  const counted: string[] = [];
+  const services = new FakeServices();
+  const engine = new FleetEngine({
+    services,
+    store: new MemoryCartStore(),
+    broadcast: () => {},
+    publish: () => {},
+    schedule: () => {},
+    log: () => {},
+    metrics: {
+      scan: (outcome) => counted.push(`scan:${outcome}`),
+      checkout: (outcome, seconds) => {
+        assert.ok(seconds >= 0);
+        counted.push(`checkout:${outcome}`);
+      },
+    },
+  });
+  await engine.handleMessage(`trolley/${T}/position`, position());
+  services.visionDown = true;
+  await engine.handleMessage(`trolley/${T}/scan`, scanMsg('bad'));
+  services.visionDown = false;
+  for (let i = 0; i < 15; i++) await engine.handleMessage(`trolley/${T}/scan`, scanMsg(`ok-${i}`));
+  assert.equal(counted.filter((c) => c === 'scan:vision unavailable').length, 1);
+  assert.equal(counted.filter((c) => c === 'scan:accepted').length, 15);
+  assert.equal(counted.filter((c) => c === 'checkout:paid').length, 1);
+});
+
+test('an unknown charge is counted as unknown, not as a failure', async () => {
+  const counted: string[] = [];
+  const services = new FakeServices();
+  services.charge = async () => {
+    throw new ChargeUnknownError('timed out');
+  };
+  const engine = new FleetEngine({
+    services,
+    store: new MemoryCartStore(),
+    broadcast: () => {},
+    publish: () => {},
+    schedule: () => {},
+    log: () => {},
+    metrics: { scan: () => {}, checkout: (outcome) => counted.push(outcome) },
+  });
+  await engine.handleMessage(`trolley/${T}/position`, position());
+  for (let i = 0; i < 15; i++) await engine.handleMessage(`trolley/${T}/scan`, scanMsg(`ok-${i}`));
+  assert.deepEqual(counted, ['unknown']);
+});
+
 test('the number of tracked trolleys is capped', async () => {
   const { engine } = setup();
   for (let i = 0; i < 1100; i++) {
