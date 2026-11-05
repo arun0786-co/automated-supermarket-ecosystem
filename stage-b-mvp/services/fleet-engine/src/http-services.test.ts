@@ -133,3 +133,19 @@ test('a vision failure throws', async () => {
   handler = respond(503, { detail: 'no vision model loaded' });
   await assert.rejects(services().scan({ weightDelta: 1 }));
 });
+
+test('purchases and feedback send no customer identity', async () => {
+  const bodies: string[] = [];
+  handler = (req, res) => {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      bodies.push(raw);
+      respond(200, {})(req, res);
+    });
+  };
+  await services().recordPurchase(['A', 'B']);
+  await services().sendFeedback('A', 1, { aisle: 1, hour: 2, cartCategories: [] });
+  assert.deepEqual(JSON.parse(bodies[0]), { skus: ['A', 'B'] });
+  assert.doesNotMatch(bodies[1], /user/i);
+});

@@ -92,8 +92,8 @@ export function httpServices(urls: Urls): Services {
       return unwrap<User>(res, 'auth-service');
     },
 
-    async recordPurchase(_userId: string, skus: string[]) {
-      // no user id leaves this service: the model learns from anonymous baskets (chapter 7.4)
+    // no user id leaves this service: the model learns from anonymous baskets (chapter 7.4)
+    async recordPurchase(skus: string[]) {
       const res = await fetch(`${urls.ai}/api/events/purchase`, jsonPost({ skus }));
       await unwrap(res, 'ai-engine');
     },
@@ -111,8 +111,8 @@ export function httpServices(urls: Urls): Services {
       return unwrap<Recommendation[]>(res, 'ai-engine');
     },
 
-    async sendFeedback(userId: string, sku: string, reward: number, context: RecommendationContext) {
-      const res = await fetch(`${urls.ai}/api/recommendations/feedback`, jsonPost({ userId, sku, reward, context }));
+    async sendFeedback(sku: string, reward: 0 | 1, context: RecommendationContext) {
+      const res = await fetch(`${urls.ai}/api/recommendations/feedback`, jsonPost({ sku, reward, context }));
       await unwrap(res, 'ai-engine');
     },
   };

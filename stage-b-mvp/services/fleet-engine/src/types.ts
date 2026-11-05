@@ -71,9 +71,9 @@ export interface Services {
   // throws ChargeUnknownError if the outcome can't be known, anything else means no charge
   checkout(address: string, amount: string, skus: string[]): Promise<ChargeResult>;
   getUser(id: string): Promise<User | null>;
-  recordPurchase(userId: string, skus: string[]): Promise<void>;
-  recommend?(userId: string, cart: CartItem[], context: RecommendationContext): Promise<Recommendation[]>;
-  sendFeedback?(userId: string, sku: string, reward: number, context: RecommendationContext): Promise<void>;
+  recordPurchase(skus: string[]): Promise<void>;
+  recommend(userId: string, cart: CartItem[], context: RecommendationContext): Promise<Recommendation[]>;
+  sendFeedback(sku: string, reward: 0 | 1, context: RecommendationContext): Promise<void>;
 }
 
 export type RecommendationContext = { aisle: number; hour: number; cartCategories: string[] };

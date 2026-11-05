@@ -158,6 +158,7 @@ check 'from a cart'       200 '"sku":"PNT-003"' -X POST -H "$CT" \
   -d '{"userId":"USR-001","cartItems":[{"sku":"PNT-002","name":"Pasta 500g","category":"Pantry"}],"limit":3}' "$GW/api/recommendations"
 check 'empty cart falls back' 200 '"sku":"BVG-001"' -X POST -H "$CT" \
   -d '{"userId":"USR-001","cartItems":[],"limit":2}' "$GW/api/recommendations"
+check 'model says what it learned from' 200 '"trainedOn":"synthetic"' "$GW/api/recommendations/model"
 
 echo '== vault'
 check 'seeded balance'    200 '"balance":"105.5"' "$GW/api/wallet/$USR1"

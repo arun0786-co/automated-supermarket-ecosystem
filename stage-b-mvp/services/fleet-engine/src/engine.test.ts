@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FleetEngine } from './engine';
-import { ChargeUnknownError, Product, Services, VisionRequest, VisionResult } from './types';
+import { CartItem, ChargeUnknownError, Product, Recommendation, RecommendationContext, Services, VisionRequest, VisionResult } from './types';
 import { MemoryCartStore } from './store';
 
 const catalog: Record<string, Product> = {
@@ -15,7 +15,7 @@ class FakeServices implements Services {
   picks: string[] = [];
   releases: [string, number][] = [];
   charges: { address: string; amount: string; skus: string[] }[] = [];
-  purchases: { userId: string; skus: string[] }[] = [];
+  purchases: { skus: string[] }[] = [];
   visionDown = false;
   productDown = false;
   pickDown = false;
@@ -51,8 +51,19 @@ class FakeServices implements Services {
     this.charges.push({ address, amount, skus });
     return this.charge();
   }
-  async recordPurchase(userId: string, skus: string[]) {
-    this.purchases.push({ userId, skus });
+  async recordPurchase(skus: string[]) {
+    this.purchases.push({ skus });
+  }
+  recs: Recommendation[] = [];
+  recommendCalls: { cartSkus: string[]; context: RecommendationContext }[] = [];
+  feedback: { sku: string; reward: number }[] = [];
+  recommendImpl: () => Promise<Recommendation[]> = async () => this.recs;
+  async recommend(_userId: string, cart: CartItem[], context: RecommendationContext) {
+    this.recommendCalls.push({ cartSkus: cart.map((i) => i.sku), context });
+    return this.recommendImpl();
+  }
+  async sendFeedback(sku: string, reward: 0 | 1, _context: RecommendationContext) {
+    this.feedback.push({ sku, reward });
   }
   async getUser(id: string) {
     return id === USER.id ? USER : null;
@@ -225,7 +236,8 @@ test('the 15th item triggers exactly one checkout for the right amount', async (
   assert.equal(ev.itemCount, 15);
   assert.equal(ev.userId, USER.id);
   assert.deepEqual(ctx.published.find((p) => p.topic.endsWith('/checkout'))?.payload, { ok: true, total: 18, hash: '0xhash' });
-  assert.deepEqual(ctx.services.purchases, [{ userId: USER.id, skus: Array(15).fill('PRD-001') }]);
+  // the model only ever sees anonymous baskets
+  assert.deepEqual(ctx.services.purchases, [{ skus: Array(15).fill('PRD-001') }]);
 });
 
 test('the cart resets after checkout and scans in between are refused', async () => {
@@ -398,6 +410,63 @@ for (const [label, topic, payload] of [
     assert.deepEqual(services.picks, ['PRD-001']);
   });
 }
+
+const rec = (sku: string): Recommendation => ({ sku, name: sku, emoji: '', category: 'Pantry', price: 1, reason: 'r', score: 1 });
+
+test('an accepted scan is followed by recommendations for that cart', async () => {
+  const ctx = await checkedIn();
+  ctx.services.recs = [rec('PNT-001')];
+  await ctx.engine.handleMessage(`trolley/${T}/position`, position(450, 20));
+  await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg('e1'));
+  await ctx.engine.idle();
+
+  const [ev] = ctx.broadcasts.filter((m) => m.type === 'RECOMMENDATION_EVENT');
+  assert.equal(ev.trolleyId, T);
+  assert.equal(ev.userId, USER.id);
+  assert.deepEqual(ev.recs, [rec('PNT-001')]);
+  const [call] = ctx.services.recommendCalls;
+  assert.deepEqual(call.cartSkus, ['PRD-001']);
+  assert.equal(call.context.aisle, 4);
+  assert.deepEqual(call.context.cartCategories, ['Produce']);
+});
+
+test('a rejected scan asks for no recommendations', async () => {
+  const ctx = await checkedIn();
+  ctx.services.visionDown = true;
+  await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg('e1'));
+  await ctx.engine.idle();
+  assert.equal(ctx.services.recommendCalls.length, 0);
+});
+
+test('adding a suggested item earns a reward, ignoring the others earns none', async () => {
+  const ctx = await checkedIn();
+  ctx.services.recs = [rec('BKR-003'), rec('PNT-001')];
+  await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg('e1'));
+  await ctx.engine.idle();
+  ctx.services.recs = [];
+  await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg('e2', 'BKR-003', 200));
+  await ctx.engine.idle();
+  assert.deepEqual(ctx.services.feedback, [{ sku: 'BKR-003', reward: 1 }, { sku: 'PNT-001', reward: 0 }]);
+});
+
+test('a dead ai engine has no effect on the scan', async () => {
+  const ctx = await checkedIn();
+  ctx.services.recommendImpl = async () => {
+    throw new Error('ai engine is down');
+  };
+  await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg('e1'));
+  await ctx.engine.idle();
+  assert.equal(scanEvents(ctx.broadcasts)[0].event.accepted, true);
+  assert.equal(ctx.engine.snapshot()[0].itemCount, 1);
+});
+
+test('a hanging ai engine does not hold up the next scan', async () => {
+  const ctx = await checkedIn();
+  ctx.services.recommendImpl = () => new Promise(() => {});
+  await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg('e1'));
+  await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg('e2'));
+  assert.equal(ctx.engine.snapshot()[0].itemCount, 2);
+});
 
 test('the number of tracked trolleys is capped', async () => {
   const { engine } = setup();

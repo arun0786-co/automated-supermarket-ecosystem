@@ -4,6 +4,8 @@ import { Cart, CartItem, CartStore, ChargeResult, ChargeUnknownError, Product, R
 const CHECKOUT_AT_ITEMS = 15;
 const RESET_AFTER_MS = 5000;
 const RECENT_EVENTS_KEPT = 50;
+// the 800 unit wide floor split into the aisles the recommender knows about
+const AISLE_WIDTH = 100;
 // the local network is treated as hostile (chapter 10), so a flood of ids can't grow memory forever
 const MAX_TROLLEYS = 1000;
 const FLOOR_LIMIT = 100_000;
@@ -53,6 +55,7 @@ export class FleetEngine {
   private readonly positions = new Map<string, Position>();
   private readonly queues = new Map<string, Promise<unknown>>();
   private readonly lowStockAlerted = new Set<string>();
+  private readonly background = new Set<Promise<unknown>>();
   // what each trolley was last shown, to score the recommendation when the next item arrives
   private readonly shown = new Map<string, { skus: string[]; context: RecommendationContext }>();
   private readonly services: Services;
@@ -204,9 +207,13 @@ export class FleetEngine {
     this.broadcast({ type: 'SCAN_EVENT', trolleyId, userId: cart.userId, event: { ...item, accepted: true } });
     this.publish(`trolley/${trolleyId}/led`, { color: 'green' });
     await this.noteStockChange(product, stockLevel);
-    await this.afterAccepted(cart, item);
 
-    if (cart.items.length >= CHECKOUT_AT_ITEMS) await this.checkout(cart);
+    if (cart.items.length >= CHECKOUT_AT_ITEMS) {
+      this.shown.delete(trolleyId);
+      await this.checkout(cart);
+    } else {
+      this.afterAccepted(cart, item);
+    }
   }
 
   private remember(cart: Cart, eventId: string) {
@@ -260,8 +267,37 @@ export class FleetEngine {
     }
   }
 
-  private async afterAccepted(_cart: Cart, _item: CartItem): Promise<void> {
-    // recommendations hook in here
+  // recommendations are extra: never awaited by the scan, so a slow or dead ai engine can't hold
+  // up a trolley
+  private afterAccepted(cart: Cart, item: CartItem) {
+    const task = this.scoreAndRecommend(cart, item).catch((err) => this.log(`recommendations failed: ${String(err)}`));
+    this.background.add(task);
+    void task.finally(() => this.background.delete(task));
+  }
+
+  private async scoreAndRecommend(cart: Cart, item: CartItem) {
+    // chapter 7.3.2: +1 if the customer added what was suggested, 0 if they ignored it
+    const previous = this.shown.get(cart.trolleyId);
+    if (previous) {
+      this.shown.delete(cart.trolleyId);
+      await Promise.all(previous.skus.map((sku) => this.services.sendFeedback(sku, sku === item.sku ? 1 : 0, previous.context)));
+    }
+
+    const position = this.positions.get(cart.trolleyId);
+    const context: RecommendationContext = {
+      aisle: Math.floor((position?.x ?? 0) / AISLE_WIDTH),
+      hour: new Date().getHours(),
+      cartCategories: [...new Set(cart.items.map((i) => i.category ?? 'Unknown'))],
+    };
+    const recs = await this.services.recommend(cart.userId, cart.items, context);
+    if (cart.status !== 'SHOPPING') return;
+    this.shown.set(cart.trolleyId, { skus: recs.map((r) => r.sku), context });
+    this.broadcast({ type: 'RECOMMENDATION_EVENT', trolleyId: cart.trolleyId, userId: cart.userId, recs });
+  }
+
+  // for tests and shutdown: resolves once background work has finished
+  async idle(): Promise<void> {
+    await Promise.all(this.background);
   }
 
   private async checkout(cart: Cart): Promise<void> {
@@ -290,7 +326,7 @@ export class FleetEngine {
     }
 
     if (result.ok) {
-      void this.services.recordPurchase(cart.userId, skus).catch((err) => this.log(`could not record purchase: ${String(err)}`));
+      void this.services.recordPurchase(skus).catch((err) => this.log(`could not record purchase: ${String(err)}`));
     } else {
       // no money moved, so the goods go back on the shelf and staff get told
       await this.releaseItems(skus);

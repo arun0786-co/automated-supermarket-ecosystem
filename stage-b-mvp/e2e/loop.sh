@@ -79,6 +79,8 @@ wait_event 'an accepted scan with the full item' 60 "e['type'] == 'SCAN_EVENT' a
 wait_event 'a rejected scan with a reason' 120 "e['type'] == 'SCAN_EVENT' and not e['event']['accepted'] and e['event']['reason'] in ('weight mismatch', 'low confidence')"
 wait_event 'a checkout on the chain' 120 "e['type'] == 'CHECKOUT_EVENT' and e['ok'] and e.get('hash', '').startswith('0x') and len(e['hash']) == 66"
 
+wait_event 'recommendations reach the feed' 30 "e['type'] == 'RECOMMENDATION_EVENT' and len(e['recs']) > 0 and e['recs'][0]['name']"
+
 echo '== the money and the stock add up'
 hash=$(python3 - "$FEED" <<'EOF'
 import json, sys
@@ -99,6 +101,9 @@ if [ "$(echo "$wallets" | json 'len(d)')" = "3" ]; then ok 'three customer walle
 if [ "$(echo "$wallets" | json "sorted(d[0])")" = "['balance', 'isSubscriber', 'name', 'overdraftLimit', 'userId']" ]; then ok 'wallets keep the stage A shape'; else nope "wallet shape: $wallets"; fi
 paid=$(echo "$wallets" | json "sum(1 for w in d if w['balance'] < {'USR-001': 105.5, 'USR-002': 67, 'USR-003': 210.75}.get(w['userId'], 0))")
 if [ "$paid" -gt 0 ]; then ok 'a customer balance went down'; else nope "no balance moved: $wallets"; fi
+
+trained=$(curl -s "$GW/api/recommendations/model")
+if [ "$(echo "$trained" | json 'd["feedbackEvents"] > 0')" = "True" ]; then ok 'the bandit receives rewards from real scans'; else nope "no feedback events: $trained"; fi
 
 echo '== vision goes down'
 compose stop vision > /dev/null 2>&1

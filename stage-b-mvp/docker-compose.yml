@@ -51,6 +51,10 @@ services:
       - "8000:8000"
     environment:
       - PRODUCT_CORE_URL=http://product-core:3001
+      - STATE_PATH=/data/ai-state.json
+    volumes:
+      # what the model has learned, kept across restarts
+      - ai_state:/data
     depends_on:
       - product-core
 
@@ -167,3 +171,4 @@ services:
 
 volumes:
   postgres_data:
+  ai_state:
