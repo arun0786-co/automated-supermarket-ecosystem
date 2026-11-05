@@ -1,13 +1,14 @@
 # root-level makefile for the whole project
 # makes it easy to start/stop things without remembering long commands
 
-.PHONY: help install test e2e stage-a stage-a-api stage-a-web stage-b stage-b-down kill
+.PHONY: help install test e2e vision-model stage-a stage-a-api stage-a-web stage-b stage-b-down kill
 
 help:
 	@echo ""
 	@echo "  make install       install stage A dependencies"
 	@echo "  make test          run every test suite in the repo"
 	@echo "  make e2e           start stage B from scratch, test it end to end, tear it down"
+	@echo "  make vision-model  export the yolov8n onnx model for the vision service"
 	@echo "  make stage-a       start both stage A servers"
 	@echo "  make stage-a-api   start api simulator only"
 	@echo "  make stage-a-web   start web dashboard only"
@@ -28,10 +29,14 @@ test:
 	cd stage-b-mvp/services/product-core && npm test
 	cd stage-b-mvp/services/fintech-vault && npx hardhat test
 	cd stage-b-mvp/services/ai-engine && python -m pytest -q
+	cd stage-b-mvp/services/vision && python -m pytest -q
 
 # needs docker. uses its own compose project and throwaway secrets
 e2e:
 	bash stage-b-mvp/e2e/run.sh
+
+vision-model:
+	bash stage-b-mvp/services/vision/scripts/export_model.sh
 
 stage-a-api:
 	cd stage-a-simulation/api-simulator && npm start

@@ -28,5 +28,9 @@ stage-a-simulation/mobile-app/build/
 # hardhat deploy output
 stage-b-mvp/services/fintech-vault/deployments/
 
+# model weights are exported locally, see services/vision/scripts/export_model.sh
+stage-b-mvp/services/vision/models/*
+!stage-b-mvp/services/vision/models/.gitkeep
+
 # example env files are templates, keep them
 !.env.example

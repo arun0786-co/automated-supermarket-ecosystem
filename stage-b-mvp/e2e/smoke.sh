@@ -59,12 +59,14 @@ wait_for "$GW/health/products" || exit 1
 wait_for "$GW/health/vault" || exit 1
 wait_for "$GW/health/ai" || exit 1
 
+wait_for "$GW/health/vision" || exit 1
 echo '== health'
 check 'gateway'           200 '"gateway":"nginx"'        "$GW/health"
 check 'product-core'      200 '"service":"product-core"' "$GW/health/products"
 check 'fintech-vault'     200 '"service":"fintech-vault"' "$GW/health/vault"
 check 'ai-engine'         200 '"service":"ai-engine"'    "$GW/health/ai"
 
+check 'vision'            200 '"service":"vision"'       "$GW/health/vision"
 echo '== catalog and pricing'
 expect 'catalog has 33 products' 33 "$(curl -s "$GW/api/products" | json 'len(d)')"
 check 'overstocked near expiry is 20% off' 200 '"price":2.4'        "$GW/api/products/BKR-003"
@@ -100,6 +102,51 @@ expect 'nothing but 201 or 409' 0 "$(grep -v -c -E '^(201|409)$' "$WORK/codes")"
 
 echo '== recommendations'
 check 'trending'          200 '"sku":"BVG-001"' "$GW/api/recommendations/trending"
+# redis takes the count atomically, so with plenty of stock nobody should get turned away
+expect 'all 40 succeeded with stock to spare' 40 "$ok"
+sleep 1
+db_stock=$(db 'select "stockLevel" from products where sku = '"'PNT-002'")
+expect 'postgres caught up with the hot count' "$after" "$db_stock"
+
+echo '== the last unit'
+# MTF-002 is seeded with 6, so 20 racing pickers must leave exactly 6 winners
+seq 1 20 | xargs -P 20 -I{} curl -s -m 30 -o /dev/null -w '%{http_code}\n' \
+  -X POST -H "$CT" -d '{"quantity":1}' "$GW/api/products/MTF-002/pick" > "$WORK/last"
+expect 'exactly the stock on hand was sold' 6 "$(grep -c '^201$' "$WORK/last")"
+check 'nothing left' 200 '"stockLevel":0' "$GW/api/products/MTF-002"
+check 'release puts it back' 201 '"stockLevel":2' -X POST -H "$CT" -d '{"quantity":2}' "$GW/api/products/MTF-002/release"
+check 'release validates the quantity' 400 'positive integer' -X POST -H "$CT" -d '{"quantity":0}' "$GW/api/products/MTF-002/release"
+
+echo '== vision and fusion'
+V="$GW/api/vision/scan"
+# the worked examples from chapter 5.4 of the spec
+check 'cereal at 450g goes in the cart' 200 '"accepted":true' -X POST -H "$CT" \
+  -d '{"weightDelta":450,"detection":{"sku":"PNT-001","confidence":0.85}}' "$V"
+check 'cereal at 1000g is rejected' 200 '"reason":"weight mismatch"' -X POST -H "$CT" \
+  -d '{"weightDelta":1000,"detection":{"sku":"PNT-001","confidence":0.85}}' "$V"
+check 'blurry frame is rejected' 200 '"reason":"low confidence"' -X POST -H "$CT" \
+  -d '{"weightDelta":450,"detection":{"sku":"PNT-001","confidence":0.3}}' "$V"
+check 'simulated input is labelled' 200 '"source":"simulated"' -X POST -H "$CT" \
+  -d '{"weightDelta":450,"detection":{"sku":"PNT-001","confidence":0.85}}' "$V"
+check 'unknown sku' 200 '"reason":"unknown item"' -X POST -H "$CT" \
+  -d '{"weightDelta":450,"detection":{"sku":"NOPE-1","confidence":0.85}}' "$V"
+check 'no camera input' 400 '' -X POST -H "$CT" -d '{"weightDelta":450}' "$V"
+if [ "$(curl -s "$GW/health/vision" | json "d['modelLoaded']")" = "True" ]; then
+  # a real camera burst through the gateway, when the model and a photo are available
+  if [ -n "${E2E_BANANA_PHOTO:-}" ]; then
+    python3 -c "
+import base64, json, sys
+frame = base64.b64encode(open('$E2E_BANANA_PHOTO', 'rb').read()).decode()
+json.dump({'weightDelta': 150, 'frames': [frame] * 5}, open('$WORK/burst.json', 'w'))"
+    check 'real photo of a banana' 200 '"sku":"PRD-001"' -X POST -H "$CT" --data-binary "@$WORK/burst.json" "$V"
+    check 'real photo uses the model' 200 '"source":"model"' -X POST -H "$CT" --data-binary "@$WORK/burst.json" "$V"
+  else
+    echo '      model loaded, set E2E_BANANA_PHOTO to test a real burst'
+  fi
+else
+  check 'frames with no model are refused' 503 'no vision model' -X POST -H "$CT" \
+    -d '{"weightDelta":150,"frames":["aGk="]}' "$V"
+fi
 check 'from a cart'       200 '"sku":"PNT-003"' -X POST -H "$CT" \
   -d '{"userId":"USR-001","cartItems":[{"sku":"PNT-002","name":"Pasta 500g","category":"Pantry"}],"limit":3}' "$GW/api/recommendations"
 check 'empty cart falls back' 200 '"sku":"BVG-001"' -X POST -H "$CT" \
