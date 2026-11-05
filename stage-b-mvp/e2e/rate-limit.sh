@@ -8,10 +8,10 @@ source "$HERE/lib.sh"
 trap 'rm -rf "$WORK"' EXIT
 
 echo '== password guessing'
-seq 1 60 | xargs -P 20 -I{} curl -s -m 30 -o /dev/null -w '%{http_code}\n' -X POST -H "$CT" \
+seq 1 60 | xargs -P 20 -I{} curl -s -m 30 -w '\n%{http_code}\n' -X POST -H "$CT" \
   -d '{"email":"arun@ase.local","password":"guess guess"}' "$GW/api/auth/login" > "$WORK/guesses"
 limited=$(grep -c '^429$' "$WORK/guesses")
 if [ "$limited" -gt 20 ]; then ok "the gateway stops it ($limited of 60 were limited)"; else nope "only $limited of 60 guesses were limited"; fi
-TOKEN= check 'and the limit answer is json' 429 'too many requests' -X POST -H "$CT" -d '{"email":"a@b.c","password":"x"}' "$GW/api/auth/login"
+if grep -q 'too many requests' "$WORK/guesses"; then ok 'and says so in json'; else nope 'the limit response was not the json one'; fi
 
 summary
