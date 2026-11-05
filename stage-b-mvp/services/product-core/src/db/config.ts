@@ -1,4 +1,4 @@
-import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
+import { PostgresDataSourceOptions } from 'typeorm/driver/postgres/PostgresDataSourceOptions';
 
 // no default password in code, fail with a clear message instead of a postgres auth error
 function requirePassword(): string {
@@ -7,7 +7,7 @@ function requirePassword(): string {
 }
 
 // DATABASE_URL wins if set, otherwise the DB_* vars (docker compose passes DB_HOST and DB_PASS)
-export const dbOptions: PostgresConnectionOptions = process.env.DATABASE_URL
+export const dbOptions: PostgresDataSourceOptions = process.env.DATABASE_URL
   ? { type: 'postgres', url: process.env.DATABASE_URL }
   : {
       type: 'postgres',
