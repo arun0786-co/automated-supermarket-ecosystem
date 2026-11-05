@@ -449,6 +449,19 @@ test('adding a suggested item earns a reward, ignoring the others earns none', a
   assert.deepEqual(ctx.services.feedback, [{ sku: 'BKR-003', reward: 1 }, { sku: 'PNT-001', reward: 0 }]);
 });
 
+test('every accepted scan gets fresh suggestions, even when feedback fails', async () => {
+  const ctx = await checkedIn();
+  ctx.services.recs = [rec('PNT-001')];
+  ctx.services.sendFeedback = async () => {
+    throw new Error('feedback refused');
+  };
+  for (const id of ['e1', 'e2', 'e3']) {
+    await ctx.engine.handleMessage(`trolley/${T}/scan`, scanMsg(id));
+    await ctx.engine.idle();
+  }
+  assert.equal(ctx.broadcasts.filter((m) => m.type === 'RECOMMENDATION_EVENT').length, 3);
+});
+
 test('a dead ai engine has no effect on the scan', async () => {
   const ctx = await checkedIn();
   ctx.services.recommendImpl = async () => {

@@ -280,7 +280,10 @@ export class FleetEngine {
     const previous = this.shown.get(cart.trolleyId);
     if (previous) {
       this.shown.delete(cart.trolleyId);
-      await Promise.all(previous.skus.map((sku) => this.services.sendFeedback(sku, sku === item.sku ? 1 : 0, previous.context)));
+      // learning is a bonus: if it fails, the customer should still get their next suggestions
+      await Promise.all(previous.skus.map((sku) => this.services.sendFeedback(sku, sku === item.sku ? 1 : 0, previous.context))).catch((err) =>
+        this.log(`could not send recommendation feedback: ${String(err)}`),
+      );
     }
 
     const position = this.positions.get(cart.trolleyId);

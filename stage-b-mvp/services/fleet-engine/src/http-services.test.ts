@@ -149,3 +149,19 @@ test('purchases and feedback send no customer identity', async () => {
   assert.deepEqual(JSON.parse(bodies[0]), { skus: ['A', 'B'] });
   assert.doesNotMatch(bodies[1], /user/i);
 });
+
+test('a 204 from the ai engine counts as success, not as bad json', async () => {
+  handler = (_req, res) => {
+    res.writeHead(204);
+    res.end();
+  };
+  await services().sendFeedback('A', 1, { aisle: 1, hour: 2, cartCategories: [] });
+  await services().recordPurchase(['A', 'B']);
+  await services().release('A', 1);
+});
+
+test('a refused feedback or purchase still throws', async () => {
+  handler = respond(500);
+  await assert.rejects(services().sendFeedback('A', 1, { aisle: 1, hour: 2, cartCategories: [] }));
+  await assert.rejects(services().recordPurchase(['A', 'B']));
+});

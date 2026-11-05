@@ -30,6 +30,11 @@ async function unwrap<T>(res: Response, what: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+// for calls where only success matters. a 204 has no body, so parsing one would throw
+function expectOk(res: Response, what: string): void {
+  if (!res.ok) throw new Error(`${what} returned ${res.status}`);
+}
+
 export function httpServices(urls: Urls): Services {
   return {
     async scan(req: VisionRequest) {
@@ -52,7 +57,7 @@ export function httpServices(urls: Urls): Services {
 
     async release(sku: string, quantity: number) {
       const res = await fetch(`${urls.products}/api/products/${encodeURIComponent(sku)}/release`, jsonPost({ quantity }));
-      await unwrap(res, 'product-core');
+      expectOk(res, 'product-core');
     },
 
     // anything that might have reached the chain is reported as unknown, never as failed,
@@ -95,7 +100,7 @@ export function httpServices(urls: Urls): Services {
     // no user id leaves this service: the model learns from anonymous baskets (chapter 7.4)
     async recordPurchase(skus: string[]) {
       const res = await fetch(`${urls.ai}/api/events/purchase`, jsonPost({ skus }));
-      await unwrap(res, 'ai-engine');
+      expectOk(res, 'ai-engine');
     },
 
     async recommend(userId: string, cart: CartItem[], context: RecommendationContext) {
@@ -113,7 +118,7 @@ export function httpServices(urls: Urls): Services {
 
     async sendFeedback(sku: string, reward: 0 | 1, context: RecommendationContext) {
       const res = await fetch(`${urls.ai}/api/recommendations/feedback`, jsonPost({ sku, reward, context }));
-      await unwrap(res, 'ai-engine');
+      expectOk(res, 'ai-engine');
     },
   };
 }
