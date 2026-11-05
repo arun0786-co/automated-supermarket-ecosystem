@@ -1,7 +1,7 @@
 # root-level makefile for the whole project
 # makes it easy to start/stop things without remembering long commands
 
-.PHONY: help install test e2e vision-model stage-a stage-a-api stage-a-web stage-b stage-b-observability stage-b-down kill
+.PHONY: help install test e2e vision-model stage-a stage-a-api stage-a-web stage-b stage-b-observability stage-b-besu stage-b-down kill
 
 help:
 	@echo ""
@@ -14,6 +14,7 @@ help:
 	@echo "  make stage-a-web   start web dashboard only"
 	@echo "  make stage-b       start stage B with docker compose"
 	@echo "  make stage-b-observability  stage B plus prometheus, grafana and jaeger"
+	@echo "  make stage-b-besu  stage B on a four validator ibft 2.0 chain"
 	@echo "  make stage-b-down  stop stage B containers"
 	@echo "  make kill          kill anything running on ports 3000 and 3001"
 	@echo ""
@@ -61,8 +62,12 @@ stage-b-observability:
 	@test -f stage-b-mvp/.env || (echo "copy stage-b-mvp/.env.example to stage-b-mvp/.env and fill it in first" && exit 1)
 	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build
 
+stage-b-besu:
+	@test -f stage-b-mvp/.env || (echo "copy stage-b-mvp/.env.example to stage-b-mvp/.env and fill it in first" && exit 1)
+	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.besu.yml up --build
+
 stage-b-down:
-	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.observability.yml down
+	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.besu.yml down
 
 # kills whatever is occupying ports 3000 and 3001
 kill:

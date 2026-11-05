@@ -193,3 +193,15 @@ jobs:
         env:
           E2E_OVERLAY: observability
           E2E_BROWSER: "0"
+
+  stage-b-besu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bash stage-b-mvp/e2e/run.sh
+        env:
+          E2E_OVERLAY: besu
+          E2E_BROWSER: "0"

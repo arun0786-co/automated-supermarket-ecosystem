@@ -23,7 +23,8 @@ export ADMIN_PASSWORD=$(openssl rand -hex 16)
   echo "GRAFANA_PASSWORD=$GRAFANA_PASSWORD"
 } > "$ENV_FILE"
 
-# E2E_OVERLAY=observability also starts docker-compose.observability.yml and runs its checks
+# E2E_OVERLAY=observability also starts docker-compose.observability.yml and runs its checks.
+# the same goes for E2E_OVERLAY=besu
 if [ -n "${E2E_OVERLAY:-}" ]; then
   export COMPOSE_FILE="docker-compose.yml:docker-compose.$E2E_OVERLAY.yml"
 fi

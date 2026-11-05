@@ -17,6 +17,9 @@ const config: HardhatUserConfig = {
     // CHAIN_RPC points at the hardhat-node container under docker compose
     localhost: {
       url: process.env.CHAIN_RPC || "http://127.0.0.1:8545",
+      // the hardhat node holds its own accounts. a real chain like besu needs them from here,
+      // and charges no gas (chapter 6)
+      ...(process.env.CHAIN_MNEMONIC ? { accounts: { mnemonic: process.env.CHAIN_MNEMONIC }, gasPrice: 0 } : {}),
     },
     // hardhat in-process network for tests, no node needed
     hardhat: {

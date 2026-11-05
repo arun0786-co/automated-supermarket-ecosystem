@@ -1,0 +1,83 @@
+# chapter 6: a private chain with IBFT 2.0 and zero gas, in place of the hardhat dev node:
+#   make stage-b-besu
+# four validators, because byzantine fault tolerance needs 3f + 1 of them to survive f failures.
+# validator keys are generated into a volume on first start, none are committed
+
+x-validator: &validator
+  image: hyperledger/besu:26.11.0
+  entrypoint: ["bash", "/besu/start-node.sh"]
+  environment:
+    - BESU_OPTS=-Xmx512m
+  healthcheck:
+    test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8545"]
+    interval: 3s
+    retries: 60
+  depends_on:
+    besu-init:
+      condition: service_completed_successfully
+
+services:
+  # the hardhat dev node stays out of this stack
+  hardhat-node:
+    profiles: ["hardhat-only"]
+
+  besu-init:
+    image: hyperledger/besu:26.11.0
+    entrypoint: ["bash", "/besu/init-network.sh"]
+    user: root
+    volumes:
+      - ./besu:/besu:ro
+      - besu_network:/network
+
+  besu-1:
+    <<: *validator
+    command: ["1"]
+    volumes:
+      - ./besu:/besu:ro
+      - besu_network:/network:ro
+      - besu_data_1:/data
+
+  besu-2:
+    <<: *validator
+    command: ["2"]
+    volumes:
+      - ./besu:/besu:ro
+      - besu_network:/network:ro
+      - besu_data_2:/data
+
+  besu-3:
+    <<: *validator
+    command: ["3"]
+    volumes:
+      - ./besu:/besu:ro
+      - besu_network:/network:ro
+      - besu_data_3:/data
+
+  besu-4:
+    <<: *validator
+    command: ["4"]
+    volumes:
+      - ./besu:/besu:ro
+      - besu_network:/network:ro
+      - besu_data_4:/data
+
+  fintech-vault:
+    environment:
+      - CHAIN_RPC=http://besu-1:8545
+      # hardhat's public test mnemonic, funded in the genesis. fine for this private test chain,
+      # a real deployment needs its own keys
+      - CHAIN_MNEMONIC=test test test test test test test test test test test junk
+    volumes:
+      # the chain outlives the container here, so the contract addresses have to as well
+      - vault_deployments:/app/deployments
+    depends_on: !override
+      besu-1:
+        condition: service_healthy
+
+volumes:
+  besu_network:
+  besu_data_1:
+  besu_data_2:
+  besu_data_3:
+  besu_data_4:
+  vault_deployments:
