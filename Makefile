@@ -30,6 +30,9 @@ test:
 	cd stage-b-mvp/services/fintech-vault && npx hardhat test
 	cd stage-b-mvp/services/ai-engine && python -m pytest -q
 	cd stage-b-mvp/services/vision && python -m pytest -q
+	cd stage-b-mvp/services/fleet-engine && npm test
+	cd stage-b-mvp/services/trolley-sim && npm test
+	cd stage-b-mvp/services/auth-service && npm test
 
 # needs docker. uses its own compose project and throwaway secrets
 e2e:

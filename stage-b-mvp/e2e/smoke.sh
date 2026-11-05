@@ -62,6 +62,8 @@ wait_for "$GW/health/products" || exit 1
 wait_for "$GW/health/vision" || exit 1
 wait_for "$GW/health/vault" || exit 1
 wait_for "$GW/health/ai" || exit 1
+wait_for "$GW/health/fleet" || exit 1
+wait_for "$GW/health/auth" || exit 1
 
 echo '== health'
 check 'gateway'           200 '"gateway":"nginx"'        "$GW/health"
@@ -69,6 +71,8 @@ check 'product-core'      200 '"service":"product-core"' "$GW/health/products"
 check 'vision'            200 '"service":"vision"'       "$GW/health/vision"
 check 'fintech-vault'     200 '"service":"fintech-vault"' "$GW/health/vault"
 check 'ai-engine'         200 '"service":"ai-engine"'    "$GW/health/ai"
+check 'fleet-engine'      200 '"service":"fleet-engine"' "$GW/health/fleet"
+check 'auth-service'      200 '"service":"auth-service"' "$GW/health/auth"
 
 echo '== catalog and pricing'
 expect 'catalog has 33 products' 33 "$(curl -s "$GW/api/products" | json 'len(d)')"
@@ -164,7 +168,7 @@ check 'mint'              200 '"ok":true'         -X POST -H "$CT" -H "authoriza
 check 'balance after mint' 200 '"balance":"67.0"' "$GW/api/wallet/$USR2"
 check 'checkout'          200 '"ok":true'         -X POST -H "$CT" -d "{\"customer\":\"$USR1\",\"amount\":\"10\",\"cartItems\":[{\"sku\":\"PRD-001\"}]}" "$GW/api/checkout"
 check 'balance after checkout' 200 '"balance":"95.5"' "$GW/api/wallet/$USR1"
-check 'checkout into overdraft' 200 '"ok":true'   -X POST -H "$CT" -d "{\"customer\":\"$USR1\",\"amount\":\"100\",\"cartItems\":[{\"sku\":\"BVG-003\"}]}" "$GW/api/checkout"
+check 'checkout into overdraft' 200 '"overdraftUsed":"4.5"' -X POST -H "$CT" -d "{\"customer\":\"$USR1\",\"amount\":\"100\",\"cartItems\":[{\"sku\":\"BVG-003\"}]}" "$GW/api/checkout"
 check 'overdraft is recorded' 200 '"overdraftOwed":"4.5"' "$GW/api/wallet/$USR1"
 check 'checkout past the limit' 200 '"ok":false'  -X POST -H "$CT" -d "{\"customer\":\"$USR2\",\"amount\":\"9999\",\"cartItems\":[]}" "$GW/api/checkout"
 check 'checkout bad amount' 400 'positive amount' -X POST -H "$CT" -d "{\"customer\":\"$USR1\",\"amount\":\"-1\"}" "$GW/api/checkout"

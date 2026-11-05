@@ -118,8 +118,60 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
 
+  fleet-engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stage-b-mvp/services/fleet-engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: stage-b-mvp/services/fleet-engine/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  trolley-sim:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stage-b-mvp/services/trolley-sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: stage-b-mvp/services/trolley-sim/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  auth-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stage-b-mvp/services/auth-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: stage-b-mvp/services/auth-service/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
   stage-b-e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # the feed recorder uses node's built-in websocket client
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - run: bash stage-b-mvp/e2e/run.sh
