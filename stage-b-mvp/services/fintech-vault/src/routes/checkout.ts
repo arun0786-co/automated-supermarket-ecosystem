@@ -1,10 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
-import { signer, checkoutAddress } from '../chain';
+import { signer, checkoutAddress, tokenAddress } from '../chain';
 import { isAddress, parseAmount } from '../validate';
 import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
+import SPMTTokenABI from '../../artifacts/contracts/SPMTToken.sol/SPMTToken.json';
 
 const router = Router();
+
+const tokenInterface = new ethers.Interface(SPMTTokenABI.abi);
 
 function getCheckout() {
   return new ethers.Contract(checkoutAddress, CheckoutABI.abi, signer);
@@ -36,7 +39,17 @@ router.post('/', async (req: Request, res: Response) => {
       .find((e: any) => e?.name === 'Purchase');
 
     if (purchaseEvent) {
-      res.json({ ok: true, hash: tx.hash, blockNumber: receipt.blockNumber, cartHash });
+      const overdraft = receipt.logs
+        .filter((log: any) => log.address.toLowerCase() === tokenAddress.toLowerCase())
+        .map((log: any) => { try { return tokenInterface.parseLog(log); } catch { return null; } })
+        .find((e: any) => e?.name === 'OverdraftUsed');
+      res.json({
+        ok: true,
+        hash: tx.hash,
+        blockNumber: receipt.blockNumber,
+        cartHash,
+        ...(overdraft ? { overdraftUsed: ethers.formatUnits(overdraft.args.amount, 18) } : {}),
+      });
     } else {
       // transaction mined but Purchase event not emitted, means CheckoutFailed was emitted
       res.json({ ok: false, hash: tx.hash, reason: 'insufficient funds or overdraft limit reached' });
