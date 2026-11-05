@@ -1,0 +1,25 @@
+{
+  "name": "fleet-engine",
+  "version": "1.0.0",
+  "description": "consumes trolley mqtt messages, runs carts and feeds the dashboard and app",
+  "scripts": {
+    "start": "node dist/main.js",
+    "build": "tsc",
+    "test": "node --require ts-node/register --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "ioredis": "^5.11.1",
+    "mqtt": "^5.16.1",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
