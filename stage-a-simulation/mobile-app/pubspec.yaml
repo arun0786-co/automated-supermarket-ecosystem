@@ -1,5 +1,5 @@
 name: ase_mobile
-description: ASE-PRIME customer mobile app. Handles wallet, live cart view, and AI recommendations.
+description: ASE-PRIME customer mobile app. Handles login, wallet, live cart view, offline catalog and recommendations.
 publish_to: 'none'
 version: 1.0.0+1
 

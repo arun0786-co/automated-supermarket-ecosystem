@@ -53,6 +53,12 @@ if [ "$status" -eq 0 ] && [ "${E2E_BROWSER:-1}" = "1" ]; then
   bash e2e/browser-check.sh ase-e2e "${E2E_SCREENSHOTS:-}"
   status=$?
 fi
+# the mobile app's state code against the live stack, when flutter is installed
+if [ "$status" -eq 0 ] && command -v flutter > /dev/null; then
+  (cd ../stage-a-simulation/mobile-app && flutter test test/live_gateway_test.dart \
+    --dart-define=REQUIRE_LOGIN=true --dart-define=SIM_HOST=localhost --dart-define="DEMO_PASSWORD=$DEMO_PASSWORD")
+  status=$?
+fi
 if [ "$status" -eq 0 ]; then
   bash e2e/rate-limit.sh
   status=$?
