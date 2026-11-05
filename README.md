@@ -1,67 +1,78 @@
 # Automated Supermarket Ecosystem (ASE-PRIME)
 
-This repo holds the code and docs for ASE-PRIME, our automated supermarket platform. We're building this in three stages because testing hardware and robotics right out of the gate is expensive and slow.
+A platform for a supermarket with no checkout queues: smart trolleys see and weigh what goes in, stock updates instantly, and payment happens by itself on a private blockchain. It follows the spec in `Automated Supermarket Ecosystem.pdf`.
 
-## The Big Picture
+**Where it stands.** The software runs end to end, with a simulated trolley standing in for the hardware. The physical trolley, a dataset of store photos and real payments don't exist yet. [docs/roadmap.md](docs/roadmap.md) says exactly what has been proven and how.
 
-The goal is to eliminate checkout lines entirely using smart trolleys (cameras, weight sensors) and an edge-to-cloud architecture. Since we can't afford a warehouse full of Jetson Nanos and LiDAR sensors right now, we are simulating the physical layer first.
+## Try it
 
-```mermaid
-graph TD
-    subgraph Frontend/Mobile
-        A[Mobile App - Flutter] --> B(API Gateway)
-        C[Web Dashboard - Next.js] --> B
-    end
-
-    subgraph Backend Microservices
-        B --> D[Product Core / Master Data]
-        B --> E[Wallet & Blockchain]
-        B --> F[AI & Recommendations]
-        B --> G[Trolley Simulation / Fleet Engine]
-    end
-
-    subgraph Data Layer
-        D --> H[(PostgreSQL)]
-        E --> I[(Ledger / Mock Blockchain)]
-        G --> J((WebSocket Realtime Feed))
-    end
+```bash
+make stage-b-env    # once: creates stage-b-mvp/.env with random secrets and prints your logins
+make stage-b        # needs docker
 ```
 
-## How We're Building This
+Open <http://localhost>, log in with the admin details it printed, and watch five trolleys shop: a live map, scans being accepted and rejected, recommendations, wallets and purchases landing on the chain.
 
-Our approach is split into three realistic stages. This repository's structure mirrors these stages so we don't end up with a mess.
+Hit a `docker-credential-desktop` error? See [stage-b-mvp/README.md](stage-b-mvp/README.md).
 
-### Stage A: Simulation (Where we are now)
-Located in `stage-a-simulation/`. We're building a full-stack demo to validate the concept and UX.
-- **Web Dashboard:** A Next.js command center. It shows a live map with moving trolleys, a real-time feed of items being "scanned", and our blockchain wallet interface.
-- **API Simulator:** A Node.js backend that fakes the hardware. It generates trolley movement paths, fakes vision/weight sensor events, and handles the mock blockchain ledger.
-- **Mobile App:** A Flutter scaffold for the customer-facing app (wallet, cart, and recommendations).
+## How it fits together
 
-### Stage B: MVP Microservices
-Located in `stage-b-mvp/`. This is where we break the monolithic simulator into actual containerized services (Service A: Product Core, Service C: Blockchain Vault, Service D: AI Recommendations) with real Postgres, Redis, and a proper message broker (MQTT/RabbitMQ).
+```mermaid
+graph LR
+    T[Trolley] -->|MQTT| F[Fleet engine]
+    F --> V[Vision and fusion]
+    F --> P[Product core and stock]
+    F --> C[Vault and blockchain]
+    F --> A[Recommendations]
+    D[Dashboard] --> G[Gateway]
+    M[Mobile app] --> G
+    G --> F
+```
 
-### Stage C: Hardware Integration (Production)
-Located in `stage-c-production/`. The real deal. Code that will actually run on the Jetson Orin Nano inside the smart trolleys. YOLOv8 models, ROS 2 navigation scripts, and deepstream pipelines.
+More in [docs/architecture.md](docs/architecture.md), and the API in [docs/api-stage-b.md](docs/api-stage-b.md).
 
-## Folder Structure
+## The three stages
+
+| Stage | Folder | What it is |
+|---|---|---|
+| A | `stage-a-simulation/` | A single process simulation, with the dashboard and app. Runs with no Docker or login |
+| B | `stage-b-mvp/` | The real services in containers. [How to run it](stage-b-mvp/README.md) |
+| C | `stage-c-production/` | Kubernetes, navigation, firmware, model training. [What's there](stage-c-production/README.md) |
+
+## Tests
+
+| Command | What it does |
+|---|---|
+| `make test` | Every unit suite. Each service needs its own install first |
+| `make e2e` | A fresh stage B, API checks, the full trolley loop, real outages, a real browser |
+| `make k8s-test` | The API checks on a real local Kubernetes cluster, plus network policies and pods being killed. Needs kind and kubectl |
+
+`.github/workflows/test.yml` runs all of these on GitHub Actions, the Besu, observability and TLS runs included.
+
+## Folder structure
 
 ```
 autimated-supermarket-system/
-├── docs/
-│   ├── architecture.md       # mermaid diagrams, data flow, tech decisions
-│   ├── api-reference.md      # all REST endpoints + websocket event schemas
-│   └── roadmap.md            # what's done, what's next
-├── stage-a-simulation/       # Phase 1, fully working
-│   ├── api-simulator/        # Node.js backend (trolley sim, mock blockchain, product API)
-│   ├── mobile-app/           # Flutter customer app (cart, wallet, home screen)
-│   └── web-dashboard/        # Next.js admin dashboard (live map, ledger, scan feed)
-├── stage-b-mvp/              # Phase 2, product-core, vault and ai-engine run in docker compose
-├── stage-c-production/       # Phase 3, hardware spec and roadmap
-├── Makefile                  # install, start and stop shortcuts
-└── README.md
+├── docs/                     architecture, api references, roadmap
+├── stage-a-simulation/
+│   ├── api-simulator/        node.js simulator
+│   ├── mobile-app/           flutter app, for stage a or stage b
+│   └── web-dashboard/        next.js dashboard, for stage a or stage b
+├── stage-b-mvp/
+│   ├── services/             the seven backend services
+│   ├── config/               gateway and broker
+│   ├── besu/                 ibft 2.0 chain
+│   ├── observability/        prometheus and grafana
+│   └── e2e/                  end to end tests
+├── stage-c-production/
+│   ├── k8s/                  kubernetes and argocd
+│   ├── robotics/             navigation and ros 2 node
+│   ├── firmware/             esp32 load cell
+│   └── vision/               model training
+└── Makefile                  run make help
 ```
 
-## First Time Setup
+## Stage A without Docker
 
 ```bash
 make install
@@ -129,9 +140,5 @@ which implements the Limited Overdraft contract from chapter 6 of the spec, gene
 SHA256 block hash, and fires a CHECKOUT_EVENT that the dashboard uses to update the ledger
 and debit the wallet card.
 
-In Stage B this whole simulator gets replaced by real MQTT messages from actual trolley
-hardware, but all the data shapes stay exactly the same so the frontend shouldn't need
-any changes.
-
----
-*actively being developed: stage A is complete, stage B is in progress*
+In Stage B this simulator is replaced by MQTT messages and real services, with the same data
+shapes, so the dashboard and app work against either one.

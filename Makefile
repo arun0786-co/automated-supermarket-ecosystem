@@ -1,7 +1,7 @@
 # root-level makefile for the whole project
 # makes it easy to start/stop things without remembering long commands
 
-.PHONY: help install test e2e k8s-test vision-model stage-a stage-a-api stage-a-web stage-b stage-b-observability stage-b-besu stage-b-down kill
+.PHONY: help install test e2e k8s-test vision-model stage-a stage-a-api stage-a-web stage-b-env stage-b stage-b-observability stage-b-besu stage-b-tls stage-b-down kill
 
 help:
 	@echo ""
@@ -13,9 +13,11 @@ help:
 	@echo "  make stage-a       start both stage A servers"
 	@echo "  make stage-a-api   start api simulator only"
 	@echo "  make stage-a-web   start web dashboard only"
+	@echo "  make stage-b-env   create stage B secrets and print the logins, run this once"
 	@echo "  make stage-b       start stage B with docker compose"
 	@echo "  make stage-b-observability  stage B plus prometheus, grafana and jaeger"
 	@echo "  make stage-b-besu  stage B on a four validator ibft 2.0 chain"
+	@echo "  make stage-b-tls   stage B with https on port 443"
 	@echo "  make stage-b-down  stop stage B containers"
 	@echo "  make kill          kill anything running on ports 3000 and 3001"
 	@echo ""
@@ -36,6 +38,8 @@ test:
 	cd stage-b-mvp/services/fleet-engine && npm test
 	cd stage-b-mvp/services/trolley-sim && npm test
 	cd stage-b-mvp/services/auth-service && npm test
+	cd stage-c-production/robotics/ase_navigation && python -m pytest -q test/test_navigation.py test/test_ros_adapters.py
+	cd stage-c-production/firmware/load_cell && c++ -std=c++17 -Isrc test/test_stabilizer.cpp -o /tmp/stabilizer-test && /tmp/stabilizer-test
 
 # needs docker. uses its own compose project and throwaway secrets
 e2e:
@@ -58,17 +62,24 @@ stage-a:
 	@echo "starting stage A: backend on :3001, frontend on :3000"
 	@(cd stage-a-simulation/api-simulator && npm start) & (cd stage-a-simulation/web-dashboard && npm run dev)
 
+stage-b-env:
+	bash stage-b-mvp/scripts/generate-env.sh
+
 stage-b:
-	@test -f stage-b-mvp/.env || (echo "copy stage-b-mvp/.env.example to stage-b-mvp/.env and set POSTGRES_PASSWORD first" && exit 1)
+	@test -f stage-b-mvp/.env || (echo "run make stage-b-env first" && exit 1)
 	cd stage-b-mvp && docker compose up --build
 
 stage-b-observability:
-	@test -f stage-b-mvp/.env || (echo "copy stage-b-mvp/.env.example to stage-b-mvp/.env and fill it in first" && exit 1)
+	@test -f stage-b-mvp/.env || (echo "run make stage-b-env first" && exit 1)
 	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build
 
 stage-b-besu:
-	@test -f stage-b-mvp/.env || (echo "copy stage-b-mvp/.env.example to stage-b-mvp/.env and fill it in first" && exit 1)
+	@test -f stage-b-mvp/.env || (echo "run make stage-b-env first" && exit 1)
 	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.besu.yml up --build
+
+stage-b-tls:
+	@test -f stage-b-mvp/certs/tls.crt || (echo "run make stage-b-env first" && exit 1)
+	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.tls.yml up --build
 
 stage-b-down:
 	cd stage-b-mvp && docker compose -f docker-compose.yml -f docker-compose.observability.yml -f docker-compose.besu.yml down

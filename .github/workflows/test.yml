@@ -217,3 +217,46 @@ jobs:
         with:
           install_only: true
       - run: bash stage-c-production/k8s/test-on-kind.sh local
+
+  stage-b-tls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bash stage-b-mvp/e2e/run.sh
+        env:
+          E2E_OVERLAY: tls
+          E2E_BROWSER: "0"
+
+  navigation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stage-c-production/robotics/ase_navigation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest
+      - run: python -m pytest -q test/test_navigation.py test/test_ros_adapters.py
+      - run: bash ../test-in-ros.sh
+
+  firmware:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stage-c-production/firmware/load_cell
+    steps:
+      - uses: actions/checkout@v4
+      - run: c++ -std=c++17 -Wall -Wextra -Werror -Isrc test/test_stabilizer.cpp -o /tmp/stabilizer-test
+      - run: /tmp/stabilizer-test
+      - run: bash build-for-esp32.sh
+
+  stage-a-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash stage-a-simulation/browser-check.sh
