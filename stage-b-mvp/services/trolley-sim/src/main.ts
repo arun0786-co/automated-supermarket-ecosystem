@@ -48,6 +48,12 @@ async function main() {
     if (topic.endsWith('/checkout')) console.log(`${topic} ${payload.toString()}`);
   });
 
+  // node runs as pid 1 in a container, where SIGTERM does nothing without a handler, and
+  // kubernetes would wait out its whole grace period with this still publishing
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => broker.end(false, () => process.exit(0)));
+  }
+
   setInterval(() => {
     if (!broker.connected) return;
     for (const t of trolleys) {

@@ -4,5 +4,6 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
+USER node
 EXPOSE 3003
 CMD ["node", "dist/main.js"]

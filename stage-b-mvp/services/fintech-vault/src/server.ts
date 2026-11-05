@@ -28,6 +28,12 @@ app.get('/api/health', async (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3002;
-createServer(app).listen(PORT, () => {
+const server = createServer(app).listen(PORT, () => {
   console.log(`fintech-vault on http://localhost:${PORT}`);
 });
+
+// node runs as pid 1 in a container, where SIGTERM does nothing without a handler. letting open
+// requests finish first means a checkout in progress still gets its answer
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => server.close(() => process.exit(0)));
+}

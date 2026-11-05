@@ -33,6 +33,20 @@ async function seed(users: PostgresUsers) {
   console.log(`seeded ${DEMO_CUSTOMERS.length} demo customers and an admin`);
 }
 
+// replicas start together and postgres may still be coming up, so one failed attempt isn't fatal
+async function untilDatabaseIsReady(setup: () => Promise<void>, attempts = 30) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await setup();
+      return;
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      console.warn(`database not ready (${String(err)}), trying again`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
+
 async function main() {
   const jwtSecret = required('JWT_SECRET');
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
@@ -48,11 +62,18 @@ async function main() {
   pool.on('error', (err) => console.warn(`postgres connection lost: ${err.message}`));
 
   const users = new PostgresUsers(pool);
-  await users.migrate();
-  await seed(users);
+  await untilDatabaseIsReady(async () => {
+    await users.migrate();
+    await seed(users);
+  });
 
   const port = Number(process.env.PORT || 3004);
-  createApp({ users, jwtSecret }).listen(port, () => console.log(`auth-service on port ${port}`));
+  const server = createApp({ users, jwtSecret }).listen(port, () => console.log(`auth-service on port ${port}`));
+
+  // node runs as pid 1 in a container, where SIGTERM does nothing without a handler
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => server.close(() => void pool.end().finally(() => process.exit(0))));
+  }
 }
 
 main().catch((err) => {
