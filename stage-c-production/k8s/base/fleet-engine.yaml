@@ -1,0 +1,93 @@
+# one replica: it holds one mqtt session, and the broker would drop a second client with the same id
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-engine
+  labels:
+    app: fleet-engine
+spec:
+  replicas: 1
+  # only one copy at a time, so never run two during a rollout
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: fleet-engine
+  template:
+    metadata:
+      labels:
+        app: fleet-engine
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fleet-engine
+          image: ghcr.io/arun0786-co/ase-fleet-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3003
+          env:
+            - name: MQTT_URL
+              value: "mqtt://mqtt-broker:1883"
+            - name: MQTT_FLEET_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ase-secrets
+                  key: MQTT_FLEET_PASSWORD
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: VISION_URL
+              value: "http://vision:8001"
+            - name: PRODUCT_CORE_URL
+              value: "http://product-core:3001"
+            - name: VAULT_URL
+              value: "http://fintech-vault:3002"
+            - name: AUTH_URL
+              value: "http://auth-service:3004"
+            - name: AI_URL
+              value: "http://ai-engine:8000"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3003
+            periodSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3003
+            periodSeconds: 10
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 3003
+            periodSeconds: 3
+            failureThreshold: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-engine
+spec:
+  selector:
+    app: fleet-engine
+  ports:
+    - port: 3003
+      targetPort: 3003

@@ -1,0 +1,38 @@
+# chapter 11.1: builds and publishes the service images when a version is tagged. argocd then
+# deploys them once stage-c-production/k8s/overlays/production points at the new tag
+name: images
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { name: product-core, context: stage-b-mvp/services/product-core }
+          - { name: vision, context: stage-b-mvp/services/vision }
+          - { name: fintech-vault, context: stage-b-mvp/services/fintech-vault }
+          - { name: ai-engine, context: stage-b-mvp/services/ai-engine }
+          - { name: auth-service, context: stage-b-mvp/services/auth-service }
+          - { name: fleet-engine, context: stage-b-mvp/services/fleet-engine }
+          - { name: trolley-sim, context: stage-b-mvp/services/trolley-sim }
+          - { name: web-dashboard, context: stage-a-simulation/web-dashboard }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ghcr.io/arun0786-co/ase-${{ matrix.name }}:${{ github.ref_name }}

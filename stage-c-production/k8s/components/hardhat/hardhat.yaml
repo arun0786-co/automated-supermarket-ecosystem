@@ -1,0 +1,72 @@
+# a throwaway dev chain. it forgets everything when this pod restarts
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chain
+  labels:
+    app: chain
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chain
+  template:
+    metadata:
+      labels:
+        app: chain
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: chain
+          image: ghcr.io/arun0786-co/ase-fintech-vault:latest
+          imagePullPolicy: IfNotPresent
+          command: ["npx", "hardhat", "node", "--hostname", "0.0.0.0"]
+          ports:
+            - containerPort: 8545
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            tcpSocket:
+              port: 8545
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chain
+spec:
+  selector:
+    app: chain
+  ports:
+    - port: 8545
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-chain
+spec:
+  podSelector:
+    matchLabels:
+      app: chain
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: fintech-vault
+      ports:
+        - port: 8545

@@ -1,0 +1,23 @@
+# chapter 6: four ibft 2.0 validators. scripts/create-besu-secret.sh generates their keys and
+# genesis into a secret, so nothing sensitive is committed
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - besu.yaml
+configMapGenerator:
+  - name: besu-start
+    files:
+      - start.sh=start-node.sh
+patches:
+  - target:
+      kind: Deployment
+      name: fintech-vault
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CHAIN_MNEMONIC
+          valueFrom:
+            secretKeyRef:
+              name: besu-network
+              key: mnemonic

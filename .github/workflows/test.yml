@@ -205,3 +205,15 @@ jobs:
         env:
           E2E_OVERLAY: besu
           E2E_BROWSER: "0"
+
+  kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: helm/kind-action@v1
+        with:
+          install_only: true
+      - run: bash stage-c-production/k8s/test-on-kind.sh local

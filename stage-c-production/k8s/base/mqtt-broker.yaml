@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mqtt-broker
+  labels:
+    app: mqtt-broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mqtt-broker
+  template:
+    metadata:
+      labels:
+        app: mqtt-broker
+    spec:
+      containers:
+        - name: mqtt-broker
+          image: eclipse-mosquitto:2
+          command: ["sh", "/mosquitto/config/start.sh"]
+          ports:
+            - containerPort: 1883
+          env:
+            - name: MQTT_FLEET_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ase-secrets
+                  key: MQTT_FLEET_PASSWORD
+            - name: MQTT_TROLLEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ase-secrets
+                  key: MQTT_TROLLEY_PASSWORD
+          readinessProbe:
+            tcpSocket:
+              port: 1883
+            periodSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: 1883
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /mosquitto/config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: mqtt-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mqtt-broker
+spec:
+  selector:
+    app: mqtt-broker
+  ports:
+    - port: 1883

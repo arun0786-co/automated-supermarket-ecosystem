@@ -1,13 +1,14 @@
 # root-level makefile for the whole project
 # makes it easy to start/stop things without remembering long commands
 
-.PHONY: help install test e2e vision-model stage-a stage-a-api stage-a-web stage-b stage-b-observability stage-b-besu stage-b-down kill
+.PHONY: help install test e2e k8s-test vision-model stage-a stage-a-api stage-a-web stage-b stage-b-observability stage-b-besu stage-b-down kill
 
 help:
 	@echo ""
 	@echo "  make install       install stage A dependencies"
 	@echo "  make test          run every test suite in the repo"
 	@echo "  make e2e           start stage B from scratch, test it end to end, tear it down"
+	@echo "  make k8s-test      deploy to a throwaway local cluster and test it, needs kind and kubectl"
 	@echo "  make vision-model  export the yolov8n onnx model for the vision service"
 	@echo "  make stage-a       start both stage A servers"
 	@echo "  make stage-a-api   start api simulator only"
@@ -39,6 +40,9 @@ test:
 # needs docker. uses its own compose project and throwaway secrets
 e2e:
 	bash stage-b-mvp/e2e/run.sh
+
+k8s-test:
+	bash stage-c-production/k8s/test-on-kind.sh local
 
 vision-model:
 	bash stage-b-mvp/services/vision/scripts/export_model.sh

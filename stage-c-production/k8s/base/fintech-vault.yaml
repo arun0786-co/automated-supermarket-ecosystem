@@ -1,0 +1,94 @@
+# one replica: every transaction comes from one signer, and two copies would fight over the nonce
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fintech-vault
+  labels:
+    app: fintech-vault
+spec:
+  replicas: 1
+  # only one copy at a time, so never run two during a rollout
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: fintech-vault
+  template:
+    metadata:
+      labels:
+        app: fintech-vault
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: deployments
+          persistentVolumeClaim:
+            claimName: vault-deployments
+      containers:
+        - name: fintech-vault
+          image: ghcr.io/arun0786-co/ase-fintech-vault:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3002
+          env:
+            - name: CHAIN_RPC
+              value: "http://chain:8545"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3002
+            periodSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3002
+            periodSeconds: 10
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 3002
+            periodSeconds: 3
+            failureThreshold: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            # the contract addresses have to outlive the pod on a chain that persists
+            - name: deployments
+              mountPath: /app/deployments
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fintech-vault
+spec:
+  selector:
+    app: fintech-vault
+  ports:
+    - port: 3002
+      targetPort: 3002
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-deployments
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 16Mi

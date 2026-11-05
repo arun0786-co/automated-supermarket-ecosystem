@@ -50,7 +50,13 @@ login() {
 compose() { docker compose -p "${E2E_PROJECT:-ase-e2e}" --env-file "$E2E_ENV_FILE" "$@"; }
 
 # reads postgres directly, only for checks the api can't answer
-db() { compose exec -T postgres psql -U ase -d ase_products -Atc "$1"; }
+db() {
+  if [ -n "${E2E_NAMESPACE:-}" ]; then
+    kubectl -n "$E2E_NAMESPACE" exec statefulset/postgres -- psql -U ase -d ase_products -Atc "$1"
+  else
+    compose exec -T postgres psql -U ase -d ase_products -Atc "$1"
+  fi
+}
 
 summary() {
   echo
