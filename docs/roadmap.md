@@ -28,7 +28,7 @@ A box is only checked if it was run and tested, and the note says how. Software 
 ### Software, tested without hardware
 
 - [x] **Besu with IBFT 2.0**: four validators, zero gas, survives one failure, halts safely on two. Measured on a laptop: 0.95 s per confirmed checkout, 42 checkouts a second. The spec's 1000+ TPS has not been shown
-- [x] **Kubernetes**: all services, deployed to a real local cluster and tested, including network policies blocking traffic and pods recovering
+- [x] **Kubernetes**: all services, deployed to a real local cluster and tested on both Hardhat and four Besu validators, including network policies blocking traffic and pods recovering
 - [x] **Metrics**: Prometheus with the spec's three metrics, Grafana dashboard
 - [x] **Tracing**: one add to cart traced through fleet and product core to Redis and Postgres in Jaeger
 - [x] **D\* Lite and A\***: layered costmap, matches a fresh A\* on random maps. On the store floor it replans in about 12 expansions against 1482 for starting over
