@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # end to end checks against a running stage B, mostly through the gateway.
 # exits non-zero if anything fails. run.sh starts the stack and calls this.
-# env: ADMIN_TOKEN (required), GW and PRODUCT_CORE to point somewhere else
+# env: ADMIN_TOKEN and E2E_ENV_FILE (required), GW and PRODUCT_CORE to point somewhere else
 set -u
 
 GW=${GW:-http://localhost:80}
@@ -53,20 +53,23 @@ wait_for() {
   return 1
 }
 
+# reads postgres directly, only for checks the api can't answer
+db() { docker compose -p "${E2E_PROJECT:-ase-e2e}" --env-file "$E2E_ENV_FILE" exec -T postgres psql -U ase -d ase_products -Atc "$1"; }
+
 json() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
 
 wait_for "$GW/health/products" || exit 1
+wait_for "$GW/health/vision" || exit 1
 wait_for "$GW/health/vault" || exit 1
 wait_for "$GW/health/ai" || exit 1
 
-wait_for "$GW/health/vision" || exit 1
 echo '== health'
 check 'gateway'           200 '"gateway":"nginx"'        "$GW/health"
 check 'product-core'      200 '"service":"product-core"' "$GW/health/products"
+check 'vision'            200 '"service":"vision"'       "$GW/health/vision"
 check 'fintech-vault'     200 '"service":"fintech-vault"' "$GW/health/vault"
 check 'ai-engine'         200 '"service":"ai-engine"'    "$GW/health/ai"
 
-check 'vision'            200 '"service":"vision"'       "$GW/health/vision"
 echo '== catalog and pricing'
 expect 'catalog has 33 products' 33 "$(curl -s "$GW/api/products" | json 'len(d)')"
 check 'overstocked near expiry is 20% off' 200 '"price":2.4'        "$GW/api/products/BKR-003"
@@ -99,9 +102,6 @@ after=$(curl -s "$GW/api/products/PNT-002" | json "d['stockLevel']")
 echo "      $ok of 40 succeeded"
 expect 'stock matches successful picks' "$((before - ok))" "$after"
 expect 'nothing but 201 or 409' 0 "$(grep -v -c -E '^(201|409)$' "$WORK/codes")"
-
-echo '== recommendations'
-check 'trending'          200 '"sku":"BVG-001"' "$GW/api/recommendations/trending"
 # redis takes the count atomically, so with plenty of stock nobody should get turned away
 expect 'all 40 succeeded with stock to spare' 40 "$ok"
 sleep 1
@@ -147,6 +147,9 @@ else
   check 'frames with no model are refused' 503 'no vision model' -X POST -H "$CT" \
     -d '{"weightDelta":150,"frames":["aGk="]}' "$V"
 fi
+
+echo '== recommendations'
+check 'trending'          200 '"sku":"BVG-001"' "$GW/api/recommendations/trending"
 check 'from a cart'       200 '"sku":"PNT-003"' -X POST -H "$CT" \
   -d '{"userId":"USR-001","cartItems":[{"sku":"PNT-002","name":"Pasta 500g","category":"Pantry"}],"limit":3}' "$GW/api/recommendations"
 check 'empty cart falls back' 200 '"sku":"BVG-001"' -X POST -H "$CT" \

@@ -56,6 +56,13 @@ jobs:
     defaults:
       run:
         working-directory: stage-b-mvp/services/product-core
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      TEST_REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -98,11 +105,6 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
 
-  stage-b-e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: bash stage-b-mvp/e2e/run.sh
   vision:
     runs-on: ubuntu-latest
     defaults:
@@ -116,3 +118,8 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
 
+  stage-b-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash stage-b-mvp/e2e/run.sh

@@ -7,6 +7,7 @@ set -u
 cd "$(dirname "$0")/.." || exit 1
 ENV_FILE=$(mktemp)
 chmod 600 "$ENV_FILE"
+export E2E_ENV_FILE=$ENV_FILE
 export ADMIN_TOKEN=$(openssl rand -hex 16)
 {
   echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"

@@ -22,8 +22,18 @@ export class ProductsController {
   // 409 if there isn't enough stock left
   @Post(':sku/pick')
   async pick(@Param('sku') sku: string, @Body() body: { quantity?: number }) {
-    const quantity = body?.quantity ?? 1;
-    if (!Number.isInteger(quantity) || quantity < 1) throw new BadRequestException('quantity must be a positive integer');
-    return { sku, stockLevel: await this.service.pick(sku, quantity) };
+    return { sku, stockLevel: await this.service.pick(sku, parseQuantity(body)) };
   }
+
+  // POST /api/products/:sku/release { quantity } - puts picked stock back
+  @Post(':sku/release')
+  async release(@Param('sku') sku: string, @Body() body: { quantity?: number }) {
+    return { sku, stockLevel: await this.service.release(sku, parseQuantity(body)) };
+  }
+}
+
+function parseQuantity(body?: { quantity?: number }): number {
+  const quantity = body?.quantity ?? 1;
+  if (!Number.isInteger(quantity) || quantity < 1) throw new BadRequestException('quantity must be a positive integer');
+  return quantity;
 }
