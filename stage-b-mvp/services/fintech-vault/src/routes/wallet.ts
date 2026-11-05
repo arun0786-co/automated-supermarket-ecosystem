@@ -33,10 +33,9 @@ router.get('/:address', async (req: Request, res: Response) => {
 
 // POST /api/wallet/mint, admin only, adds SPMT when customer tops up via fiat
 router.post('/mint', async (req: Request, res: Response) => {
-  // stop-gap until the gateway does JWT: a shared admin token, mint is off without one
-  const adminToken = process.env.ADMIN_TOKEN;
-  if (!adminToken || req.headers.authorization !== `Bearer ${adminToken}`) {
-    return res.status(403).json({ error: 'admin token required' });
+  // the gateway verifies the token and sets this. the vault isn't published outside the stack
+  if (req.headers['x-user-role'] !== 'admin') {
+    return res.status(403).json({ error: 'admin only' });
   }
   const { to, amount } = req.body;
   const wei = parseAmount(amount);
