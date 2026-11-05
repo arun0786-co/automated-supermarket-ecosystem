@@ -48,6 +48,15 @@ if [ "$status" -eq 0 ]; then
   bash e2e/loop.sh
   status=$?
 fi
+# a real browser against the real stack. E2E_BROWSER=0 skips it, the image is large
+if [ "$status" -eq 0 ] && [ "${E2E_BROWSER:-1}" = "1" ]; then
+  bash e2e/browser-check.sh ase-e2e "${E2E_SCREENSHOTS:-}"
+  status=$?
+fi
+if [ "$status" -eq 0 ]; then
+  bash e2e/rate-limit.sh
+  status=$?
+fi
 if [ "$status" -ne 0 ]; then
   compose ps
   compose logs --no-color --tail 40

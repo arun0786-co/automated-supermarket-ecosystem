@@ -78,6 +78,10 @@ wait_event 'a rejected scan with a reason' 120 "e['type'] == 'SCAN_EVENT' and no
 wait_event 'a checkout on the chain' 120 "e['type'] == 'CHECKOUT_EVENT' and e['ok'] and e.get('hash', '').startswith('0x') and len(e['hash']) == 66"
 
 wait_event 'recommendations reach the feed' 30 "e['type'] == 'RECOMMENDATION_EVENT' and len(e['recs']) > 0 and e['recs'][0]['name']"
+# not just the first one: each accepted scan should bring new suggestions
+recs=$(feed_count "e['type'] == 'RECOMMENDATION_EVENT'")
+scans=$(feed_count "e['type'] == 'SCAN_EVENT' and e['event']['accepted']")
+if [ "$scans" -gt 5 ] && [ $((recs * 10)) -ge $((scans * 7)) ]; then ok "suggestions keep coming ($recs for $scans accepted scans)"; else nope "only $recs suggestions for $scans accepted scans"; fi
 
 echo '== the money and the stock add up'
 hash=$(python3 - "$FEED" <<'EOF'
@@ -162,10 +166,9 @@ sleep 3
 code=$(api -m 10 -o /dev/null -w '%{http_code}' -X POST -H "$CT" -d '{"quantity":1}' "$GW/api/products/PNT-004/pick")
 if [ "$code" = "201" ] && [ "$(stock_sku PNT-004)" = "$((s0 - 2))" ]; then ok 'no pick was lost or counted twice across the outage'; else nope "after the outage: $code, stock $(stock_sku PNT-004), wanted $((s0 - 2))"; fi
 
-echo '== password guessing'
-seq 1 60 | xargs -P 20 -I{} curl -s -m 30 -o /dev/null -w '%{http_code}\n' -X POST -H "$CT" \
-  -d '{"email":"arun@ase.local","password":"guess guess"}' "$GW/api/auth/login" > "$WORK/guesses"
-limited=$(grep -c '^429$' "$WORK/guesses")
-if [ "$limited" -gt 20 ]; then ok "the gateway stops it ($limited of 60 were limited)"; else nope "only $limited of 60 guesses were limited"; fi
+echo '== the logs stay clean'
+compose start trolley-sim > /dev/null 2>&1
+errors=$(compose logs --no-color fleet-engine 2>&1 | grep -c -E 'recommendations failed|could not send recommendation feedback|could not record purchase')
+expect 'recommendations never failed along the way' 0 "$errors"
 
 summary

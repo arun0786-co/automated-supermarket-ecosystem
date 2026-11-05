@@ -32,6 +32,11 @@ check 'ai-engine'         200 '"service":"ai-engine"'    "$GW/health/ai"
 check 'fleet-engine'      200 '"service":"fleet-engine"' "$GW/health/fleet"
 check 'auth-service'      200 '"service":"auth-service"' "$GW/health/auth"
 
+echo '== dashboard'
+TOKEN= check 'the dashboard loads through the gateway' 200 'ASE-PRIME Dashboard' "$GW/"
+script=$(curl -s "$GW/" | grep -o '/_next/static/[^"]*\.js' | head -1)
+TOKEN= check 'and so do its scripts' 200 '' "$GW$script"
+
 echo '== catalog and pricing'
 expect 'catalog has 33 products' 33 "$(api "$GW/api/products" | json 'len(d)')"
 check 'overstocked near expiry is 20% off' 200 '"price":2.4'        "$GW/api/products/BKR-003"
@@ -160,7 +165,7 @@ TOKEN=$ARUN check 'recommendation feedback is not exposed' 404 '' -X POST -H "$C
 TOKEN=$ADMIN check 'internal routes are not exposed' 404 '' "$GW/internal/users/USR-001"
 TOKEN=$ADMIN check 'unknown routes are a 404' 404 '' "$GW/nothing-here"
 
-for port in 3001 3002 3003 3004 8000 8001 5432 6379 8545; do
+for port in 3000 3001 3002 3003 3004 8000 8001 5432 6379 8545; do
   code=$(curl -s -m 3 -o /dev/null -w '%{http_code}' "http://localhost:$port/" 2>/dev/null)
   expect "port $port is not reachable from outside" 000 "$code"
 done
