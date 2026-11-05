@@ -138,6 +138,10 @@ services:
         condition: service_healthy
 
   # ── API Gateway ─────────────────────────────────────────────
+  # ── Fleet dashboard, served through the gateway ─────────────
+  web-dashboard:
+    build: ../stage-a-simulation/web-dashboard
+
   # the only way in from outside, along with the broker for trolleys (chapter 10.1)
   gateway:
     image: nginx:1.29-alpine
@@ -154,6 +158,7 @@ services:
       - ai-engine
       - fleet-engine
       - auth-service
+      - web-dashboard
 
 volumes:
   postgres_data:

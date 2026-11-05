@@ -24,7 +24,7 @@ install:
 # stage B suites need their own npm install / pip install -r requirements-dev.txt first
 test:
 	cd stage-a-simulation/api-simulator && npm test
-	cd stage-a-simulation/web-dashboard && npm run lint
+	cd stage-a-simulation/web-dashboard && npm run lint && npm test
 	cd stage-a-simulation/mobile-app && flutter analyze && flutter test
 	cd stage-b-mvp/services/product-core && npm test
 	cd stage-b-mvp/services/fintech-vault && npx hardhat test

@@ -1,11 +1,11 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
-import type { ScanEvent } from '@/app/page';
+import type { LiveRecommendation, ScanEvent } from '@/app/page';
 import { useMemo } from 'react';
 
-// last accepted sku -> suggestions, all real catalog items. the pairs mirror the
-// co-purchase matrix in stage-b-mvp/services/ai-engine (service D)
+// stage A has no ai engine, so it uses this table: last accepted sku -> suggestions, all real
+// catalog items. stage B sends what the trained model picked instead
 type Rec = { item: string; reason: string; emoji: string };
 const RECS: Record<string, Rec[]> = {
   'PRD-001': [{ item: 'Greek Yogurt',    reason: 'Commonly bought together', emoji: '🫙' }, { item: 'Cereal Box',      reason: 'Popular breakfast combo',  emoji: '🥣' }],
@@ -25,14 +25,15 @@ const TRENDING: Rec[] = [
   { item: 'Dark Chocolate',  reason: 'Trending in your area', emoji: '🍫' },
 ];
 
-type Props = { scanEvents: ScanEvent[] };
+type Props = { scanEvents: ScanEvent[]; live?: LiveRecommendation[] };
 
-export default function RecommendationFeed({ scanEvents }: Props) {
+export default function RecommendationFeed({ scanEvents, live = [] }: Props) {
   const recs = useMemo(() => {
+    if (live.length > 0) return live.map((r) => ({ item: r.name, reason: r.reason, emoji: r.emoji }));
     // newest accepted scan that has pairings. rejected scans never reached the cart
     const latest = scanEvents.find((e) => e.event.accepted && RECS[e.event.sku]);
     return latest ? RECS[latest.event.sku] : TRENDING;
-  }, [scanEvents]);
+  }, [scanEvents, live]);
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
