@@ -15,6 +15,8 @@ Everything that can be built and tested without a physical trolley or a paid clo
 make k8s-test     # needs docker, kind and kubectl. creates a cluster, tests it, removes it
 ```
 
+If `mqtt-broker` crash-loops with `Unable to open config file`, the host has an AppArmor profile for mosquitto, which Ubuntu 26.04 on GitHub's runners does. It attaches to the broker inside kind by its path. Unload it first with `sudo apparmor_parser -R /etc/apparmor.d/mosquitto`. CI does this.
+
 To deploy somewhere real:
 
 ```bash
