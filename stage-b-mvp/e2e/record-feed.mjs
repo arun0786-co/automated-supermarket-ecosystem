@@ -6,9 +6,16 @@ const [url, output] = process.argv.slice(2);
 
 function connect() {
   const socket = new WebSocket(url);
+  let retrying = false;
+  const retry = () => {
+    if (retrying) return;
+    retrying = true;
+    setTimeout(connect, 500);
+  };
   socket.onmessage = (event) => appendFileSync(output, `${event.data}\n`);
-  socket.onclose = () => setTimeout(connect, 500);
-  socket.onerror = () => {};
+  socket.onclose = retry;
+  // node fires only error, not close, when the handshake is refused during a restart
+  socket.onerror = retry;
 }
 
 connect();
