@@ -216,6 +216,10 @@ jobs:
       - uses: helm/kind-action@v1
         with:
           install_only: true
+      # pods in kind run without an apparmor profile, so the runner's own profile for mosquitto
+      # attaches to the broker by its path and blocks the mounted config
+      - name: unload the runner's mosquitto apparmor profile
+        run: "[ ! -f /etc/apparmor.d/mosquitto ] || sudo apparmor_parser -R /etc/apparmor.d/mosquitto"
       - run: bash stage-c-production/k8s/test-on-kind.sh local
 
   stage-b-tls:

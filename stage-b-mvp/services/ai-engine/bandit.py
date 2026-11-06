@@ -1,6 +1,7 @@
 """contextual bandit from chapter 7.3.2 of the spec: location, cart and time go in,
 a recommendation comes out, and the reward is whether the customer added it."""
 import math
+import threading
 from typing import Optional
 
 import numpy as np
@@ -33,6 +34,8 @@ class LinUCB:
         self.alpha = alpha
         self.a_inverse: dict[str, np.ndarray] = {}
         self.b: dict[str, np.ndarray] = {}
+        # fastapi runs the handlers on several threads
+        self._lock = threading.Lock()
 
     def _arm(self, sku: str):
         if sku not in self.a_inverse:
@@ -40,20 +43,24 @@ class LinUCB:
         return self.a_inverse[sku], self.b[sku]
 
     def score(self, sku: str, x: np.ndarray) -> float:
-        a_inverse, b = self._arm(sku)
+        # update swaps in new arrays, so these stay valid after the lock is released
+        with self._lock:
+            a_inverse, b = self._arm(sku)
         return float((a_inverse @ b) @ x + self.alpha * math.sqrt(max(x @ a_inverse @ x, 0.0)))
 
     def update(self, sku: str, x: np.ndarray, reward: float) -> None:
-        a_inverse, b = self._arm(sku)
-        product = a_inverse @ x
-        self.a_inverse[sku] = a_inverse - np.outer(product, product) / (1.0 + x @ product)
-        self.b[sku] = b + reward * x
+        with self._lock:
+            a_inverse, b = self._arm(sku)
+            product = a_inverse @ x
+            self.a_inverse[sku] = a_inverse - np.outer(product, product) / (1.0 + x @ product)
+            self.b[sku] = b + reward * x
 
     def to_json(self) -> dict:
-        return {
-            "alpha": self.alpha,
-            "arms": {sku: {"aInverse": self.a_inverse[sku].tolist(), "b": self.b[sku].tolist()} for sku in self.a_inverse},
-        }
+        with self._lock:
+            return {
+                "alpha": self.alpha,
+                "arms": {sku: {"aInverse": self.a_inverse[sku].tolist(), "b": self.b[sku].tolist()} for sku in self.a_inverse},
+            }
 
     @classmethod
     def from_json(cls, data: dict) -> "LinUCB":
