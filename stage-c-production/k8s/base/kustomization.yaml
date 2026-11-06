@@ -1,0 +1,32 @@
+# every service from the compose stack. a chain comes from the overlay: hardhat for testing,
+# the besu component for anything real. both are reached as the "chain" service
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ase
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - redis.yaml
+  - mqtt-broker.yaml
+  - product-core.yaml
+  - vision.yaml
+  - fintech-vault.yaml
+  - ai-engine.yaml
+  - auth-service.yaml
+  - fleet-engine.yaml
+  - web-dashboard.yaml
+  - gateway.yaml
+  - autoscaling.yaml
+  - network-policies.yaml
+configMapGenerator:
+  # generated from stage-b-mvp/config by scripts/sync-config.sh, don't edit these copies
+  - name: gateway-config
+    files:
+      - config/nginx.conf
+      - config/nginx-protected.conf
+      - config/nginx-admin.conf
+  - name: mqtt-config
+    files:
+      - mosquitto.conf=config/mosquitto.conf
+      - acl.conf=config/mosquitto-acl.conf
+      - start.sh=config/mosquitto-start.sh

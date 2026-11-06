@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vision
+  labels:
+    app: vision
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vision
+  template:
+    metadata:
+      labels:
+        app: vision
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      # the weights aren't in the image or the repo. without a MODEL_URL the service still runs
+      # fusion for simulated trolleys and refuses real camera frames
+      initContainers:
+        - name: fetch-model
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - 'if [ -n "$MODEL_URL" ]; then wget -q -O /models/yolov8n.onnx "$MODEL_URL"; fi'
+          env:
+            - name: MODEL_URL
+              value: ""
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          emptyDir: {}
+      containers:
+        - name: vision
+          image: ghcr.io/arun0786-co/ase-vision:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+          env:
+            - name: PRODUCT_CORE_URL
+              value: "http://product-core:3001"
+            - name: MODEL_PATH
+              value: "/models/yolov8n.onnx"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8001
+            periodSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8001
+            periodSeconds: 10
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8001
+            periodSeconds: 3
+            failureThreshold: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 1
+              memory: 768Mi
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vision
+spec:
+  selector:
+    app: vision
+  ports:
+    - port: 8001
+      targetPort: 8001

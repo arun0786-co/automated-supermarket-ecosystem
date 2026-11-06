@@ -1,15 +1,14 @@
 'use client';
 
-import { ShoppingCart, Zap, BarChart2, Wallet, Box, Settings } from 'lucide-react';
+import { BarChart2, Link2, ShoppingCart, Wallet } from 'lucide-react';
+import { STAGE_LABEL } from '@/lib/config';
 import Link from 'next/link';
 
 const navItems = [
   { icon: BarChart2, label: 'Dashboard', href: '/', active: true },
-  { icon: ShoppingCart, label: 'Trolleys', href: '#' },
-  { icon: Box, label: 'Inventory', href: '#' },
-  { icon: Wallet, label: 'Wallets', href: '#' },
-  { icon: Zap, label: 'Analytics', href: '#' },
-  { icon: Settings, label: 'Settings', href: '#' },
+  { icon: ShoppingCart, label: 'Trolleys', href: '#map' },
+  { icon: Wallet, label: 'Wallets', href: '#wallets' },
+  { icon: Link2, label: 'Ledger', href: '#ledger' },
 ];
 
 export default function Sidebar() {
@@ -48,7 +47,7 @@ export default function Sidebar() {
       {/* stage badge */}
       <div className="px-3 mt-4">
         <div className="hidden lg:flex flex-col gap-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3">
-          <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-widest">Stage A</span>
+          <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-widest">{STAGE_LABEL}</span>
           <span className="text-xs text-slate-400">Simulation active</span>
         </div>
       </div>

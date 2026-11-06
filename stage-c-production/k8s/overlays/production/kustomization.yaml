@@ -1,0 +1,40 @@
+# what argocd deploys: released images and the real chain. no simulator, trolleys connect to the
+# broker's public address and customers come through the gateway's.
+# create the ase-secrets and besu-network secrets first, see the readme
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ase
+resources:
+  - ../../base
+components:
+  - ../../components/besu
+images:
+  - name: ghcr.io/arun0786-co/ase-product-core
+    newTag: v1.0.0
+  - name: ghcr.io/arun0786-co/ase-vision
+    newTag: v1.0.0
+  - name: ghcr.io/arun0786-co/ase-fintech-vault
+    newTag: v1.0.0
+  - name: ghcr.io/arun0786-co/ase-ai-engine
+    newTag: v1.0.0
+  - name: ghcr.io/arun0786-co/ase-auth-service
+    newTag: v1.0.0
+  - name: ghcr.io/arun0786-co/ase-fleet-engine
+    newTag: v1.0.0
+  - name: ghcr.io/arun0786-co/ase-web-dashboard
+    newTag: v1.0.0
+patches:
+  - target:
+      kind: Service
+      name: gateway
+    patch: |-
+      - op: add
+        path: /spec/type
+        value: LoadBalancer
+  - target:
+      kind: Service
+      name: mqtt-broker
+    patch: |-
+      - op: add
+        path: /spec/type
+        value: LoadBalancer

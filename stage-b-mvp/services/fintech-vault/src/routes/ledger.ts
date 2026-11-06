@@ -5,6 +5,10 @@ import CheckoutABI from '../../artifacts/contracts/Checkout.sol/Checkout.json';
 
 const router = Router();
 
+// besu refuses a log query wider than this. hardhat only mines on demand, but a chain with a
+// steady block time would lose its purchase history in minutes with a much smaller window
+const BLOCK_WINDOW = 5000;
+
 // GET /api/ledger?limit=20&page=0
 // reads Purchase events directly from the chain, no off-chain DB needed
 router.get('/', async (req: Request, res: Response) => {
@@ -12,9 +16,9 @@ router.get('/', async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const blockNumber = await latestBlock();
 
-    // scan the last 500 blocks for purchase events
+    // scan recent blocks for purchase events
     // in production this would use an indexer like The Graph instead of scanning
-    const fromBlock = Math.max(0, blockNumber - 500);
+    const fromBlock = Math.max(0, blockNumber - BLOCK_WINDOW);
     const checkout = new ethers.Contract(checkoutAddress, CheckoutABI.abi, provider);
 
     const filter = checkout.filters.Purchase();

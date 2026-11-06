@@ -1,0 +1,45 @@
+# chapter 11.2: metrics, dashboards and tracing, on top of the normal stack:
+#   make stage-b-observability
+# then grafana is on http://localhost:3100, prometheus on :9090 and jaeger on :16686.
+# all three only listen on this machine, none of them go through the gateway
+
+services:
+  product-core:
+    environment:
+      - OTEL_SERVICE_NAME=product-core
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - NODE_OPTIONS=--require ./dist/tracing.js
+
+  fleet-engine:
+    environment:
+      - OTEL_SERVICE_NAME=fleet-engine
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - NODE_OPTIONS=--require ./dist/tracing.js
+
+  jaeger:
+    image: jaegertracing/jaeger:2.10.0
+    ports:
+      - "127.0.0.1:16686:16686"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    ports:
+      - "127.0.0.1:3100:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD in stage-b-mvp/.env}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+    volumes:
+      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/ase.yml:ro
+      - ./observability/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/ase.yml:ro
+      - ./observability/grafana/store-health.json:/var/lib/grafana/dashboards/store-health.json:ro
+    depends_on:
+      - prometheus

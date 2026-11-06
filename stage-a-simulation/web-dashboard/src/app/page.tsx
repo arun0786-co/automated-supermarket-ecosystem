@@ -8,7 +8,9 @@ import MetricsBar from '@/components/MetricsBar';
 import Sidebar from '@/components/Sidebar';
 import RecommendationFeed from '@/components/RecommendationFeed';
 import LedgerFeed from '@/components/LedgerFeed';
-import { SIM_HTTP, SIM_WS } from '@/lib/config';
+import LoginGate from '@/components/LoginGate';
+import { feedUrl, REQUIRE_LOGIN, SIM_HTTP, STAGE_LABEL } from '@/lib/config';
+import type { Session } from '@/lib/session';
 
 export type Trolley = {
   id: string;
@@ -59,22 +61,43 @@ export type Wallet = {
   lastHash: string;
 };
 
-export default function Dashboard() {
+export type LiveRecommendation = { sku: string; name: string; emoji: string; reason: string };
+
+// the websocket closes with this when the token expires
+const TOKEN_EXPIRED = 4401;
+
+export default function Page() {
+  if (!REQUIRE_LOGIN) return <Dashboard />;
+  return <LoginGate>{(session, logout) => <Dashboard session={session} logout={logout} />}</LoginGate>;
+}
+
+function Dashboard({ session, logout }: { session?: Session; logout?: () => void }) {
   const ws = useRef<WebSocket | null>(null);
   const [trolleys, setTrolleys] = useState<Trolley[]>([]);
   const [scanEvents, setScanEvents] = useState<ScanEvent[]>([]);
   const [checkouts, setCheckouts] = useState<CheckoutEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const [txCount, setTxCount] = useState(0);
+  const [liveRecs, setLiveRecs] = useState<LiveRecommendation[]>([]);
 
   // wallet list and balances come from the simulator, last block hash from checkout events
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
   // re-sync balances from the server, the source of truth for the mock ledger
   const fetchWallets = useCallback(() => {
-    fetch(`${SIM_HTTP}/api/wallets`)
-      .then((res) => res.json())
-      .then((data: { userId: string; name: string; balance: number }[]) => {
+    type WalletRow = { userId: string; name: string; balance: number };
+    // staff see everyone, a customer only ever gets their own
+    const customer = session?.user?.role === 'customer' ? session.user.id : null;
+    const request = session
+      ? session.fetch(customer ? `/api/wallets/${encodeURIComponent(customer)}` : '/api/wallets')
+      : fetch(`${SIM_HTTP}/api/wallets`);
+    request
+      .then((res) => {
+        if (!res.ok) throw new Error(`wallets returned ${res.status}`);
+        return res.json();
+      })
+      .then((body: WalletRow | WalletRow[]) => {
+        const data = Array.isArray(body) ? body : [body];
         setWallets((prev) =>
           data.map((w) => ({
             userId: w.userId,
@@ -85,24 +108,33 @@ export default function Dashboard() {
         );
       })
       .catch(() => { /* simulator not up yet, the websocket retry will catch it */ });
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     // set on unmount so the onclose handler doesn't schedule a reconnect
     let stopped = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
 
-    const connect = () => {
-      const socket = new WebSocket(SIM_WS);
+    const connect = async () => {
+      const token = session ? await session.token() : null;
+      if (stopped) return;
+      // no token right now: either the network is down, so try again, or the session has
+      // ended, in which case the login form has already replaced this view
+      if (session && !token) {
+        retry = setTimeout(connect, 3000);
+        return;
+      }
+      const socket = new WebSocket(feedUrl(token));
       ws.current = socket;
 
       socket.onopen = () => {
         setConnected(true);
         fetchWallets();
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         setConnected(false);
-        if (!stopped) retry = setTimeout(connect, 3000);
+        // an expired token reconnects straight away with a fresh one, so the feed barely blinks
+        if (!stopped) retry = setTimeout(connect, event.code === TOKEN_EXPIRED ? 0 : 3000);
       };
 
       socket.onmessage = (evt) => {
@@ -117,6 +149,10 @@ export default function Dashboard() {
           setScanEvents((prev) =>
             [{ ...msg, ts: new Date().toLocaleTimeString() }, ...prev].slice(0, 40)
           );
+        }
+
+        if (msg.type === 'RECOMMENDATION_EVENT') {
+          setLiveRecs(msg.recs);
         }
 
         if (msg.type === 'CHECKOUT_EVENT') {
@@ -134,13 +170,13 @@ export default function Dashboard() {
       };
     };
 
-    connect();
+    void connect();
     return () => {
       stopped = true;
       clearTimeout(retry);
       ws.current?.close();
     };
-  }, [fetchWallets]);
+  }, [fetchWallets, session]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -151,9 +187,21 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">ASE-PRIME Fleet Command</h1>
-            <p className="text-slate-400 text-sm mt-0.5">Stage A · Simulation Engine · 5 virtual trolleys</p>
+            <p className="text-slate-400 text-sm mt-0.5">
+              {REQUIRE_LOGIN
+                ? `${STAGE_LABEL} · MQTT fleet · ${trolleys.length} ${trolleys.length === 1 ? 'trolley' : 'trolleys'}`
+                : `${STAGE_LABEL} · Simulation Engine · 5 virtual trolleys`}
+            </p>
           </div>
           <div className="flex items-center gap-2 text-xs">
+            {session?.user && (
+              <span className="mr-3 flex items-center gap-2 text-slate-400">
+                {session.user.name}
+                <button type="button" onClick={logout} className="rounded border border-slate-700 px-2 py-0.5 text-slate-300 hover:border-slate-500">
+                  Log out
+                </button>
+              </span>
+            )}
             <span className={`w-2 h-2 rounded-full animate-pulse ${connected ? 'bg-emerald-400' : 'bg-rose-500'}`} />
             <span className={connected ? 'text-emerald-400' : 'text-rose-400'}>
               {connected ? 'Fleet Connected' : 'Reconnecting…'}
@@ -165,23 +213,23 @@ export default function Dashboard() {
 
         {/* main grid */}
         <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 lg:col-span-7">
+          <div id="map" className="col-span-12 lg:col-span-7 scroll-mt-5">
             <StoreMap trolleys={trolleys} />
           </div>
           <div className="col-span-12 lg:col-span-5 flex flex-col gap-5">
             <ScanFeed events={scanEvents} />
-            <RecommendationFeed scanEvents={scanEvents} />
+            <RecommendationFeed scanEvents={scanEvents} live={liveRecs} />
           </div>
         </div>
 
         {/* wallets + ledger */}
         <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div id="wallets" className="col-span-12 lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-5 scroll-mt-5">
             {wallets.map((w) => (
               <WalletCard key={w.userId} userId={w.userId} name={w.name} balance={w.balance} lastHash={w.lastHash} />
             ))}
           </div>
-          <div className="col-span-12 lg:col-span-4">
+          <div id="ledger" className="col-span-12 lg:col-span-4 scroll-mt-5">
             <LedgerFeed checkouts={checkouts} />
           </div>
         </div>

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ase_navigation</name>
+  <version>1.0.0</version>
+  <description>Layered costmap, A* and D* Lite planning for the ASE smart trolley (chapter 8 of the spec)</description>
+  <maintainer email="arun0786-co@users.noreply.github.com">Arun</maintainer>
+  <license>Proprietary</license>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

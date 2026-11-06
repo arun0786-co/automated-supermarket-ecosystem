@@ -1,0 +1,23 @@
+# chapter 11.1: argocd watches this repo and keeps the cluster matching overlays/production.
+# apply once to a cluster that has argocd installed. moving to a new release means changing the
+# image tags in that overlay and committing
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ase-prime
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/arun0786-co/automated-supermarket-ecosystem.git
+    targetRevision: main
+    path: stage-c-production/k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ase
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,50 @@
+# stands in for the trolley hardware. starts at zero so tests can check exact balances first
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trolley-sim
+  labels:
+    app: trolley-sim
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: trolley-sim
+  template:
+    metadata:
+      labels:
+        app: trolley-sim
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: trolley-sim
+          image: ghcr.io/arun0786-co/ase-trolley-sim:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MQTT_URL
+              value: mqtt://mqtt-broker:1883
+            - name: MQTT_TROLLEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ase-secrets
+                  key: MQTT_TROLLEY_PASSWORD
+            - name: PRODUCT_CORE_URL
+              value: http://product-core:3001
+            - name: SCAN_PROBABILITY
+              value: "0.6"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

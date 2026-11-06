@@ -6,8 +6,6 @@ services:
   # ── Service A: Product Core (Chapter 4) ─────────────────────
   product-core:
     build: ./services/product-core
-    ports:
-      - "3001:3001"
     environment:
       - DB_HOST=postgres
       - DB_PASS=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in stage-b-mvp/.env}
@@ -18,14 +16,23 @@ services:
       redis:
         condition: service_started
 
+  # ── Service B: Vision & Sensor Fusion (Chapter 5) ───────────
+  vision:
+    build: ./services/vision
+    environment:
+      - PRODUCT_CORE_URL=http://product-core:3001
+      - MODEL_PATH=/models/yolov8n.onnx
+    volumes:
+      # exported with services/vision/scripts/export_model.sh, not committed
+      - ./services/vision/models:/models:ro
+    depends_on:
+      - product-core
+
   # ── Service C: Fintech Vault / Blockchain (Chapter 6) ───────
   fintech-vault:
     build: ./services/fintech-vault
-    ports:
-      - "3002:3002"
     environment:
       - CHAIN_RPC=http://hardhat-node:8545
-      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
     depends_on:
       hardhat-node:
         condition: service_healthy
@@ -33,10 +40,12 @@ services:
   # ── Service D: AI Recommendations (Chapter 7) ───────────────
   ai-engine:
     build: ./services/ai-engine
-    ports:
-      - "8000:8000"
     environment:
       - PRODUCT_CORE_URL=http://product-core:3001
+      - STATE_PATH=/data/ai-state.json
+    volumes:
+      # what the model has learned, kept across restarts
+      - ai_state:/data
     depends_on:
       - product-core
 
@@ -53,47 +62,104 @@ services:
       test: ["CMD", "pg_isready", "-U", "ase", "-d", "ase_products"]
       interval: 2s
       retries: 30
-    ports:
-      - "5432:5432"
 
   redis:
     image: redis:7-alpine
     command: redis-server --save 60 1
-    ports:
-      - "6379:6379"
 
   # ── Local Blockchain (replaces Hyperledger Besu in dev) ─────
   hardhat-node:
     # same image as the vault so `hardhat node` runs inside the hardhat project
     build: ./services/fintech-vault
     command: ["npx", "hardhat", "node", "--hostname", "0.0.0.0"]
-    ports:
-      - "8545:8545"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8545',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_blockNumber'})}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 2s
       retries: 30
 
-  # ── MQTT Broker (replaces WebSocket in Stage B) ─────────────
+  # ── MQTT Broker (Chapter 3) ─────────────────────────────────
   mqtt-broker:
     image: eclipse-mosquitto:2
+    environment:
+      - MQTT_FLEET_PASSWORD=${MQTT_FLEET_PASSWORD:?set MQTT_FLEET_PASSWORD in stage-b-mvp/.env}
+      - MQTT_TROLLEY_PASSWORD=${MQTT_TROLLEY_PASSWORD:?set MQTT_TROLLEY_PASSWORD in stage-b-mvp/.env}
+    command: ["sh", "/mosquitto/config/start.sh"]
     ports:
       - "1883:1883"
-      - "9001:9001"
     volumes:
-      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./config/mosquitto-acl.conf:/mosquitto/config/acl.conf:ro
+      - ./config/mosquitto-start.sh:/mosquitto/config/start.sh:ro
+
+  # ── Trolley hardware stand-in, speaks only MQTT ─────────────
+  trolley-sim:
+    build: ./services/trolley-sim
+    environment:
+      - MQTT_URL=mqtt://mqtt-broker:1883
+      - MQTT_TROLLEY_PASSWORD=${MQTT_TROLLEY_PASSWORD:?set MQTT_TROLLEY_PASSWORD in stage-b-mvp/.env}
+      - PRODUCT_CORE_URL=http://product-core:3001
+      - SCAN_PROBABILITY=${SCAN_PROBABILITY:-0.05}
+    depends_on:
+      - mqtt-broker
+      - product-core
+
+  # ── Fleet engine: carts, live feed, connects the services ───
+  fleet-engine:
+    build: ./services/fleet-engine
+    environment:
+      - MQTT_URL=mqtt://mqtt-broker:1883
+      - MQTT_FLEET_PASSWORD=${MQTT_FLEET_PASSWORD:?set MQTT_FLEET_PASSWORD in stage-b-mvp/.env}
+      - REDIS_URL=redis://redis:6379
+      - VISION_URL=http://vision:8001
+      - PRODUCT_CORE_URL=http://product-core:3001
+      - VAULT_URL=http://fintech-vault:3002
+      - AUTH_URL=http://auth-service:3004
+      - AI_URL=http://ai-engine:8000
+    depends_on:
+      - mqtt-broker
+      - redis
+      - vision
+      - product-core
+      - fintech-vault
+      - auth-service
+      - ai-engine
+
+  # ── Auth Service (Chapter 10) ───────────────────────────────
+  auth-service:
+    build: ./services/auth-service
+    environment:
+      - DB_HOST=postgres
+      - DB_PASS=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in stage-b-mvp/.env}
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in stage-b-mvp/.env, at least 32 characters}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:?set DEMO_PASSWORD in stage-b-mvp/.env}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?set ADMIN_PASSWORD in stage-b-mvp/.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # ── API Gateway ─────────────────────────────────────────────
+  # ── Fleet dashboard, served through the gateway ─────────────
+  web-dashboard:
+    build: ../stage-a-simulation/web-dashboard
+
+  # the only way in from outside, along with the broker for trolleys (chapter 10.1)
   gateway:
-    image: nginx:alpine
+    image: nginx:1.29-alpine
     ports:
       - "80:80"
     volumes:
-      - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx-protected.conf:/etc/nginx/nginx-protected.conf:ro
+      - ./config/nginx-admin.conf:/etc/nginx/nginx-admin.conf:ro
     depends_on:
       - product-core
+      - vision
       - fintech-vault
       - ai-engine
+      - fleet-engine
+      - auth-service
+      - web-dashboard
 
 volumes:
   postgres_data:
+  ai_state:

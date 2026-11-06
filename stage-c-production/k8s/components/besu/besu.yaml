@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: besu
+  labels:
+    app: besu
+spec:
+  serviceName: besu-peers
+  replicas: 4
+  # every validator has to find its peers while starting, one at a time would never get a quorum
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: besu
+  template:
+    metadata:
+      labels:
+        app: besu
+        role: chain
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: besu
+          image: hyperledger/besu:26.11.0
+          command: ["sh", "/start/start.sh"]
+          env:
+            - name: BESU_OPTS
+              value: -Xmx512m
+          ports:
+            - name: rpc
+              containerPort: 8545
+            - name: p2p
+              containerPort: 30303
+          readinessProbe:
+            tcpSocket:
+              port: 8545
+            periodSeconds: 3
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: network
+              mountPath: /network
+              readOnly: true
+            - name: start
+              mountPath: /start
+              readOnly: true
+      volumes:
+        - name: network
+          secret:
+            secretName: besu-network
+        - name: start
+          configMap:
+            name: besu-start
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+# how validators find each other
+apiVersion: v1
+kind: Service
+metadata:
+  name: besu-peers
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: besu
+  ports:
+    - port: 30303
+---
+# what the vault talks to, whichever validator answers
+apiVersion: v1
+kind: Service
+metadata:
+  name: chain
+spec:
+  selector:
+    app: besu
+  ports:
+    - port: 8545
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-besu
+spec:
+  podSelector:
+    matchLabels:
+      app: besu
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: fintech-vault
+      ports:
+        - port: 8545
+    - from:
+        - podSelector:
+            matchLabels:
+              app: besu
+      ports:
+        - port: 30303

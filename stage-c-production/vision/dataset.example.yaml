@@ -1,0 +1,14 @@
+# copy to store.yaml and point it at your labelled photos, in yolo format. no real store dataset
+# exists yet, and the model is only as good as the photos. take them inside a trolley basket, under
+# store lighting, with several items in shot, not on a clean white background.
+#
+# the names are the skus. the vision service looks a detection up in the catalog by this name
+path: /data/store-images
+train: images/train
+val: images/val
+
+names:
+  0: PRD-001
+  1: PRD-002
+  2: PNT-001
+  # one line per sku, the spec plans for 50,000 of them

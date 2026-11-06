@@ -75,3 +75,12 @@ describe("Checkout", () => {
       .to.be.revertedWith("not owner");
   });
 });
+
+// the deploy script keeps existing contracts on a chain that persists. this is the check it uses
+describe("deployment detection", () => {
+  it("finds code at a deployed contract and none at an empty address", async () => {
+    const { checkout } = await deploy();
+    expect(await ethers.provider.getCode(await checkout.getAddress())).to.not.equal("0x");
+    expect(await ethers.provider.getCode(ethers.Wallet.createRandom().address)).to.equal("0x");
+  });
+});

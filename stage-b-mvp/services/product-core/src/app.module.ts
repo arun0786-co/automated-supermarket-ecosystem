@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductsModule } from './products/products.module';
 import { dbOptions } from './db/config';
 import { HealthController } from './health.controller';
+import { MetricsController } from './metrics.controller';
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { HealthController } from './health.controller';
     }),
     ProductsModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
 })
 export class AppModule {}

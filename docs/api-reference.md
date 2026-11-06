@@ -1,5 +1,7 @@
 # API Reference: Stage A Simulator
 
+Stage B has its own reference: [api-stage-b.md](api-stage-b.md).
+
 Base URL: `http://localhost:3001`
 WebSocket: `ws://localhost:3001`
 

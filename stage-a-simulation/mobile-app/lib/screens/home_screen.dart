@@ -58,7 +58,9 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    cart.connected ? 'Trolley TROLLEY-100 connected' : 'Connecting to fleet…',
+                    cart.connected
+                        ? (cart.trolleyId == null ? 'Connected, waiting for your trolley' : 'Trolley ${cart.trolleyId} connected')
+                        : (cart.items.isEmpty ? 'Connecting to fleet…' : 'Offline, showing your last known cart'),
                     style: TextStyle(
                       color: cart.connected ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
                       fontSize: 13,
@@ -93,6 +95,14 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
+            // what the recommendation model suggests for this cart
+            if (cart.recommendations.isNotEmpty) ...[
+              const Text('You might also want', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 10),
+              ...cart.recommendations.map((rec) => _RecommendationTile(rec: rec)),
+              const SizedBox(height: 24),
+            ],
+
             // total
             if (cart.items.isNotEmpty)
               Container(
@@ -116,6 +126,38 @@ class HomeScreen extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RecommendationTile extends StatelessWidget {
+  final Map<String, dynamic> rec;
+  const _RecommendationTile({required this.rec});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Row(
+        children: [
+          Text(rec['emoji'] as String? ?? '🛒', style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(rec['name'] as String? ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              Text(rec['reason'] as String? ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+            ]),
+          ),
+          Text('${((rec['price'] as num?) ?? 0).toStringAsFixed(2)} SPMT',
+            style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 13)),
+        ],
       ),
     );
   }

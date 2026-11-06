@@ -1,0 +1,34 @@
+# same as local, on the real ibft 2.0 chain. needs scripts/create-besu-secret.sh first
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ase
+resources:
+  - ../../base
+  - trolley-sim.yaml
+components:
+  - ../../components/besu
+images:
+  - name: ghcr.io/arun0786-co/ase-product-core
+    newName: ase-k8s-product-core
+    newTag: latest
+  - name: ghcr.io/arun0786-co/ase-vision
+    newName: ase-k8s-vision
+    newTag: latest
+  - name: ghcr.io/arun0786-co/ase-fintech-vault
+    newName: ase-k8s-fintech-vault
+    newTag: latest
+  - name: ghcr.io/arun0786-co/ase-ai-engine
+    newName: ase-k8s-ai-engine
+    newTag: latest
+  - name: ghcr.io/arun0786-co/ase-auth-service
+    newName: ase-k8s-auth-service
+    newTag: latest
+  - name: ghcr.io/arun0786-co/ase-fleet-engine
+    newName: ase-k8s-fleet-engine
+    newTag: latest
+  - name: ghcr.io/arun0786-co/ase-web-dashboard
+    newName: ase-k8s-web-dashboard
+    newTag: latest
+  - name: ghcr.io/arun0786-co/ase-trolley-sim
+    newName: ase-k8s-trolley-sim
+    newTag: latest

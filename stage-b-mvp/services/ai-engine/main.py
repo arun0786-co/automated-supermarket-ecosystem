@@ -1,17 +1,27 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import List, Literal, Optional
 import os
+
+from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 import httpx
-from collections import defaultdict
 
-# service D: AI recommendation engine
-# stage A was using a simple rule-based lookup table
-# this replaces it with item-based collaborative filtering using purchase history
-# stage C will upgrade this to a full matrix factorisation model (SVD or ALS)
+from bandit import encode_context
+from model import Trainer
 
-app = FastAPI(title="ASE-PRIME AI Engine", version="0.1.0")
+# service D: learns what goes together from baskets (chapter 7.3.1) and which suggestion works
+# in which situation from what customers actually add (chapter 7.3.2)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    trainer.save()
+
+
+app = FastAPI(title="ASE-PRIME AI Engine", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,10 +40,27 @@ class CartItem(BaseModel):
     category: str
     quantity: int = 1
 
+# chapter 7.3.2: where the customer is, what is in the cart, what time it is
+class RecommendationContext(BaseModel):
+    aisle: Optional[int] = None
+    hour: Optional[int] = None
+    cartCategories: Optional[List[str]] = Field(None, max_length=200)
+
 class RecommendationRequest(BaseModel):
     userId: str
     cartItems: List[CartItem]
-    limit: int = 4
+    limit: int = Field(4, ge=1, le=50)
+    context: Optional[RecommendationContext] = None
+
+class Feedback(BaseModel):
+    sku: str
+    # chapter 7.3.2: +1 if added to the cart, 0 if ignored
+    reward: Literal[0, 1]
+    context: Optional[RecommendationContext] = None
+
+class Purchase(BaseModel):
+    # only skus: nothing here can identify the customer (chapter 7.4)
+    skus: List[str] = Field(max_length=500)
 
 class Recommendation(BaseModel):
     sku: str
@@ -44,8 +71,8 @@ class Recommendation(BaseModel):
     reason: str
     score: float
 
-# hand-coded co-purchase matrix, just enough to make it look real for stage B
-# in stage C this gets replaced by a proper SVD model trained on actual transaction data
+# hand-written pairings. they seed the model with generated baskets until real purchases take
+# over, and they supply the human-readable reason shown next to a suggestion
 # format: { sku: [(related_sku, score, reason), ...] }
 CO_PURCHASE_MATRIX = {
     "PRD-001": [("DRY-003", 0.92, "commonly bought together"), ("PNT-001", 0.88, "popular breakfast combo"), ("PNT-005", 0.79, "users who bought bananas")],
@@ -74,6 +101,31 @@ TRENDING = [
     {"sku": "PRD-004", "reason": "staff pick"},
 ]
 
+trainer = Trainer(CO_PURCHASE_MATRIX, state_path=os.environ.get("STATE_PATH"))
+
+# how much the bandit can move an item compared with the basket model
+BANDIT_WEIGHT = 0.5
+
+
+def context_vector(context: Optional[RecommendationContext], cart_categories: List[str]):
+    context = context or RecommendationContext()
+    return encode_context(
+        context.aisle,
+        context.hour if context.hour is not None else datetime.now().hour,
+        context.cartCategories if context.cartCategories is not None else cart_categories,
+    )
+
+
+def best_reason(sku: str, cart_skus: set[str]) -> str:
+    """the reason from the strongest hand-written pairing, whichever item was scanned first"""
+    best_score, best = 0.0, "frequently bought together"
+    for cart_sku in cart_skus:
+        for related, score, reason in CO_PURCHASE_MATRIX.get(cart_sku, []):
+            if related == sku and score > best_score:
+                best_score, best = score, reason
+    return best
+
+
 async def fetch_catalog() -> dict[str, dict]:
     """whole priced catalog from product-core in one request, keyed by sku"""
     try:
@@ -85,73 +137,78 @@ async def fetch_catalog() -> dict[str, dict]:
         pass
     return {}
 
+
+def to_recommendation(sku: str, product: dict, reason: str, score: float) -> Recommendation:
+    return Recommendation(
+        sku=sku,
+        name=product["name"],
+        emoji=product.get("emoji", "🛒"),
+        category=product["category"],
+        price=float(product["price"]),
+        reason=reason,
+        score=round(score, 3),
+    )
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "ai-engine", "stage": "B"}
 
+
 @app.post("/api/recommendations", response_model=List[Recommendation])
 async def get_recommendations(req: RecommendationRequest):
-    # aggregate scores from co-purchase matrix for all items in the cart
-    candidate_scores: dict[str, float] = defaultdict(float)
-    candidate_reasons: dict[str, str] = {}
-    # strongest single pairing per candidate, so the reason shown is the best one
-    best_pair_score: dict[str, float] = {}
     cart_skus = {item.sku for item in req.cartItems}
-
-    for item in req.cartItems:
-        related = CO_PURCHASE_MATRIX.get(item.sku, [])
-        for related_sku, score, reason in related:
-            # don't recommend things already in the cart
-            if related_sku not in cart_skus:
-                candidate_scores[related_sku] += score
-                if score > best_pair_score.get(related_sku, 0):
-                    best_pair_score[related_sku] = score
-                    candidate_reasons[related_sku] = reason
-
-    # sort by score descending
-    ranked = sorted(candidate_scores.items(), key=lambda x: x[1], reverse=True)
-
-    # if we have nothing, fall back to trending
-    if not ranked:
-        ranked = [(item["sku"], 0.5) for item in TRENDING[:req.limit]]
-        candidate_reasons = {item["sku"]: item["reason"] for item in TRENDING}
-
     catalog = await fetch_catalog()
+    x = context_vector(req.context, [item.category for item in req.cartItems])
+
+    # the basket model decides what is relevant, the bandit reorders it for this situation.
+    # only items the model already relates to the cart can be suggested
+    related = {sku: score for sku, score in trainer.scores(cart_skus).items() if score > 0}
+    ranked = sorted(
+        ((sku, score + BANDIT_WEIGHT * trainer.bandit.score(sku, x)) for sku, score in related.items()),
+        key=lambda pair: pair[1],
+        reverse=True,
+    )
+
     results: List[Recommendation] = []
     for sku, score in ranked:
         # skip anything product-core doesn't know about or has deactivated
         product = catalog.get(sku)
-        if not product:
-            continue
-        results.append(Recommendation(
-            sku=sku,
-            name=product["name"],
-            emoji=product.get("emoji", "🛒"),
-            category=product["category"],
-            price=float(product["price"]),
-            reason=candidate_reasons.get(sku, "frequently bought together"),
-            score=round(score, 3),
-        ))
+        if product:
+            results.append(to_recommendation(sku, product, best_reason(sku, cart_skus), score))
+        if len(results) >= req.limit:
+            return results
+
+    # not enough related items, so fill up with what is popular
+    for item in TRENDING:
+        product = catalog.get(item["sku"])
         if len(results) >= req.limit:
             break
-
+        if product and item["sku"] not in cart_skus and all(r.sku != item["sku"] for r in results):
+            results.append(to_recommendation(item["sku"], product, item["reason"], 0.5))
     return results
+
 
 @app.get("/api/recommendations/trending", response_model=List[Recommendation])
 async def trending():
-    """returns hardcoded trending items, useful when there's no cart context"""
+    """most popular items, useful when there's no cart context"""
     catalog = await fetch_catalog()
-    results = []
-    for item in TRENDING:
-        product = catalog.get(item["sku"])
-        if product:
-            results.append(Recommendation(
-                sku=item["sku"],
-                name=product["name"],
-                emoji=product.get("emoji", "🛒"),
-                category=product["category"],
-                price=float(product["price"]),
-                reason=item["reason"],
-                score=0.5,
-            ))
-    return results
+    return [to_recommendation(i["sku"], catalog[i["sku"]], i["reason"], 0.5) for i in TRENDING if i["sku"] in catalog]
+
+
+@app.get("/api/recommendations/model")
+def model_status():
+    """what the model learned from, so nobody mistakes generated data for real behaviour"""
+    return trainer.status()
+
+
+@app.post("/api/recommendations/feedback", status_code=204)
+def feedback(event: Feedback):
+    trainer.feedback(event.sku, context_vector(event.context, []), float(event.reward))
+    return Response(status_code=204)
+
+
+@app.post("/api/events/purchase", status_code=202)
+def purchase(event: Purchase):
+    trainer.add_purchase(event.skus)
+    return {"accepted": True}

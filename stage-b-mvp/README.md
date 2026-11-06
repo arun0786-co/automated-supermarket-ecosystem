@@ -1,83 +1,76 @@
-# Stage B: MVP Microservices
+# Stage B: Microservices
 
-This directory is the next phase of ASE-PRIME. The goal here is to break apart the
-monolithic Stage A simulator into real, containerised microservices with actual databases,
-a message broker, and containerised deployments.
+The whole system running in containers: a simulated trolley publishes over MQTT, and everything else is the real software.
 
-## What Changes from Stage A to Stage B
+## Run it
 
-| Component | Stage A | Stage B |
-|---|---|---|
-| Trolley data | Simulated in Node.js | Real MQTT messages from hardware OR a high-fidelity ROS 2 bag replay |
-| Database | In-memory (Map) | PostgreSQL + Redis |
-| Blockchain | Mock SHA256 hashes | Hyperledger Besu node (private EVM chain) |
-| AI Recommendations | Rule-based lookup table | Collaborative filtering (Python / FastAPI) |
-| Deployment | `npm start` on localhost | Docker Compose |
-| Auth | None | JWT (short-lived tokens) + mTLS between services |
+```bash
+make stage-b-env    # once: creates .env with random secrets and prints your logins
+make stage-b        # builds and starts everything
+```
+
+Open <http://localhost> and log in with the admin details it printed.
+
+| Command | Adds |
+|---|---|
+| `make stage-b` | The normal stack on the Hardhat dev chain |
+| `make stage-b-besu` | A real four validator IBFT 2.0 chain |
+| `make stage-b-observability` | Prometheus on :9090, Grafana on :3100, Jaeger on :16686 |
+| `make stage-b-tls` | HTTPS on :443 |
+| `make stage-b-down` | Stops it, keeping data |
+
+**If Docker says `docker-credential-desktop` isn't found**, remove the `"credsStore": "desktop"` line from `~/.docker/config.json`. It's left over from Docker Desktop.
+
+**Customers run out of money.** At the default pace all three wallets run dry in roughly 10 minutes, after which checkouts are refused, stock goes back and staff get an alert. That's the right behaviour. To top one up, log in as admin and call the mint route:
+
+```bash
+curl -X POST http://localhost/api/wallet/mint -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"to":"0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC","amount":"100"}'
+```
+
+The addresses are in `services/auth-service/src/main.ts`.
 
 ## Services
 
-### Service A: Product Core
-- **Runtime:** Node.js (TypeScript) + NestJS
-- **DB:** PostgreSQL (Redis read cache not wired yet)
-- **Exposes:** REST
+| Service | Spec | Built with | Holds |
+|---|---|---|---|
+| `product-core` | A, chapter 4 | NestJS, TypeORM | Catalog and stock in Postgres, live counts in Redis |
+| `vision` | B, chapter 5 | FastAPI, onnxruntime | Nothing |
+| `fintech-vault` | C, chapter 6 | Express, ethers | Contract addresses |
+| `ai-engine` | D, chapter 7 | FastAPI, numpy | Model state, in a volume |
+| `auth-service` | chapter 10 | Express, Postgres | Users and the person to address mapping |
+| `fleet-engine` | connects them | Express, MQTT | Carts in Redis |
+| `trolley-sim` | hardware stand-in | MQTT only | Nothing, replaced by real trolleys in stage C |
+| `web-dashboard` | fleet command | Next.js | Nothing |
+| `gateway` | chapter 3 | nginx | Nothing |
 
-### Service B: Vision API (edge simulation, not started)
-- **Runtime:** Python 3.11 + FastAPI
-- **ML:** YOLOv8-nano (ONNX format for portability, no GPU needed for stage B)
-- **Input:** Simulated image frames from video files
+The API is in [docs/api-stage-b.md](../docs/api-stage-b.md) and the design in [docs/architecture.md](../docs/architecture.md).
 
-### Service C: Fintech Vault
-- **Runtime:** Node.js + ethers.js
-- **Chain:** Local Hardhat network (EVM-compatible, instant mining)
-- **Contract:** `SPMTToken.sol` + `Checkout.sol`
+## The vision model
 
-### Service D: Recommendation Engine
-- **Runtime:** Python + FastAPI
-- **Algorithm:** hand-written co-purchase matrix for now; collaborative filtering with surprise + contextual bandits is next
-
-### Gateway
-- **Runtime:** NGINX
-- **Handles:** routing and health checks today; JWT validation, rate limiting and SSL termination are next
-
-## Getting Started
+Simulated trolleys send what the camera would have reported, labelled `simulated` in every response. To use the real model on real images:
 
 ```bash
-# from the repo root, needs Docker
-cp stage-b-mvp/.env.example stage-b-mvp/.env   # then set POSTGRES_PASSWORD and ADMIN_TOKEN
-make stage-b
+make vision-model   # exports yolov8n to services/vision/models, not committed
 ```
 
-No passwords live in the repo. Compose refuses to start without `POSTGRES_PASSWORD`, and
-mint stays disabled while `ADMIN_TOKEN` is empty. To run product-core outside Docker, set
-`DATABASE_URL` or `DB_PASS` (plus `DB_HOST`, `DB_USER`, `DB_NAME` if they differ from the defaults).
+The pretrained model only knows 5 catalog items: banana, apple, orange, broccoli and carrot. Recognising the rest takes a model trained on store photos, see `stage-c-production/vision`.
 
-Everything is reached through the nginx gateway on port 80:
-
-| Path | Service |
-|---|---|
-| `GET /health` | gateway itself |
-| `GET /health/products`, `/health/vault`, `/health/ai` | each service's health |
-| `GET /api/products`, `GET /api/products/:sku` | product-core catalog with pricing |
-| `POST /api/products/:sku/pick` `{ "quantity": 1 }` | take stock, 409 if not enough left |
-| `GET /api/wallet/:address` | SPMT balance and overdraft state |
-| `POST /api/wallet/mint` | top up, needs `Authorization: Bearer $ADMIN_TOKEN` |
-| `POST /api/checkout` `{ customer, amount, cartItems }` | on-chain checkout |
-| `GET /api/ledger` | recent Purchase events from the chain |
-| `POST /api/recommendations` | co-purchase recommendations for a cart |
-
-On start, product-core seeds any missing products and the vault deploys fresh contracts
-to the hardhat node, minting the three Stage A demo customers onto hardhat accounts #2 to #4.
-The hardhat chain is in-memory, so balances reset when the stack restarts.
+Ultralytics and its weights are AGPL-3.0. That matters if this ever ships as a closed commercial product: it needs Ultralytics' enterprise licence, or a different model.
 
 ## Tests
 
 ```bash
-cd services/product-core && npm install && npm test
-cd services/fintech-vault && npm install && npx hardhat test
-cd services/ai-engine && pip install -r requirements-dev.txt && python -m pytest
+make test    # every unit suite, each service needs its own install first
+make e2e     # starts a fresh stack, tests it, removes it
 ```
 
-## What You Need to Install First
-- Docker with Compose
-- Node.js 22.13+ and Python 3.11+ to run the tests outside Docker
+`make e2e` takes about 6 minutes. It uses its own compose project and throwaway secrets, so your data isn't touched, but it needs ports 80 and 1883 free, so stop a running stack first. It covers the API, who can do what, the whole trolley loop, real outages, a real browser and the mobile app's state code against the live stack.
+
+`E2E_OVERLAY=besu`, `observability` or `tls` adds those checks. `E2E_BROWSER=0` skips the browser, whose image is large. `E2E_BANANA_PHOTO=<path>` adds a real camera burst when the model is exported.
+
+Some bugs only show over time. It's worth leaving `make stage-b` running for a couple of hours, then checking that the Postgres stock total matches the catalog and searching the fleet engine's log for errors. That's how the recommendations bug in the git history was found.
+
+## Needs
+
+Docker with Compose. To run tests outside Docker: Node 22.13 or newer, Python 3.11 and Flutter.

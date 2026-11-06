@@ -1,10 +1,28 @@
-import { writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { ethers, network } from "hardhat";
 
 // deploy script for local hardhat node
 // run: npx hardhat run scripts/deploy.ts --network localhost
 
+async function alreadyDeployed(): Promise<boolean> {
+  const file = `deployments/${network.name}.json`;
+  if (!existsSync(file)) return false;
+  try {
+    const { CHECKOUT_ADDRESS } = JSON.parse(readFileSync(file, "utf8"));
+    // the hardhat node forgets everything on restart, so the file alone proves nothing
+    return (await ethers.provider.getCode(CHECKOUT_ADDRESS)) !== "0x";
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
+  // on a chain that persists, deploying again would replace the token and wipe every balance
+  if (await alreadyDeployed()) {
+    console.log("contracts already on this chain, keeping them");
+    return;
+  }
+
   const [deployer, storeWallet] = await ethers.getSigners();
   console.log(`deploying from: ${deployer.address}`);
   console.log(`store wallet:   ${storeWallet.address}`);

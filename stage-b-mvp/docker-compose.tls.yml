@@ -1,0 +1,11 @@
+# chapter 3.1.2: https at the gateway, with a certificate from make stage-b-env or your own in
+# stage-b-mvp/certs (tls.crt and tls.key):
+#   make stage-b-tls
+
+services:
+  gateway:
+    ports:
+      - "443:443"
+    volumes:
+      - ./config/nginx-tls.conf:/etc/nginx/tls.conf:ro
+      - ./certs:/etc/nginx/certs:ro

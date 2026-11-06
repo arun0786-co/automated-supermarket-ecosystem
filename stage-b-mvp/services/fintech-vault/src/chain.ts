@@ -2,7 +2,11 @@ import { existsSync, readFileSync } from 'fs';
 import { ethers } from 'ethers';
 
 // connection to the hardhat node (or besu in stage C), shared by all routes
-export const provider = new ethers.JsonRpcProvider(process.env.CHAIN_RPC || 'http://localhost:8545');
+// ethers checks for a receipt every 4s by default, which would add seconds to every checkout on a
+// chain with a 1s block time (chapter 6: a shopper shouldn't wait for finality)
+export const provider = new ethers.JsonRpcProvider(process.env.CHAIN_RPC || 'http://localhost:8545', undefined, {
+  pollingInterval: 250,
+});
 
 // signer is the deployer account, which owns both contracts.
 // the fallback is hardhat's public test account #0, never use it on a real chain

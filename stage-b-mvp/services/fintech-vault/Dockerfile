@@ -3,6 +3,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# hardhat writes to its cache and to deployments/ at runtime
+RUN mkdir -p deployments && chown -R node:node /app
+USER node
 # compile once at build time so the abi json the routes import is in the image
 RUN npx hardhat compile
 EXPOSE 3002

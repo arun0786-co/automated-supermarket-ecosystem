@@ -1,0 +1,219 @@
+# chapter 10.1 treats the local network as hostile. nothing talks to anything by default, and each
+# service lists exactly who may reach it
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-gateway
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: 80
+---
+# trolleys connect from the store network, and still have to log in
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-mqtt-broker
+spec:
+  podSelector:
+    matchLabels:
+      app: mqtt-broker
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: 1883
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-postgres
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: product-core
+        - podSelector:
+            matchLabels:
+              app: auth-service
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-redis
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: product-core
+        - podSelector:
+            matchLabels:
+              app: fleet-engine
+      ports:
+        - port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-product-core
+spec:
+  podSelector:
+    matchLabels:
+      app: product-core
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+        - podSelector:
+            matchLabels:
+              app: fleet-engine
+        - podSelector:
+            matchLabels:
+              app: vision
+        - podSelector:
+            matchLabels:
+              app: ai-engine
+        - podSelector:
+            matchLabels:
+              app: trolley-sim
+      ports:
+        - port: 3001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-vision
+spec:
+  podSelector:
+    matchLabels:
+      app: vision
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+        - podSelector:
+            matchLabels:
+              app: fleet-engine
+      ports:
+        - port: 8001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-fintech-vault
+spec:
+  podSelector:
+    matchLabels:
+      app: fintech-vault
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+        - podSelector:
+            matchLabels:
+              app: fleet-engine
+      ports:
+        - port: 3002
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-ai-engine
+spec:
+  podSelector:
+    matchLabels:
+      app: ai-engine
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+        - podSelector:
+            matchLabels:
+              app: fleet-engine
+      ports:
+        - port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-auth-service
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+        - podSelector:
+            matchLabels:
+              app: fleet-engine
+      ports:
+        - port: 3004
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-fleet-engine
+spec:
+  podSelector:
+    matchLabels:
+      app: fleet-engine
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - port: 3003
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-to-web-dashboard
+spec:
+  podSelector:
+    matchLabels:
+      app: web-dashboard
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - port: 3000

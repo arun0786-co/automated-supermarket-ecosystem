@@ -1,69 +1,65 @@
 # ASE-PRIME Roadmap
 
+A box is only checked if it was run and tested, and the note says how. Software that works but has never touched real hardware says so.
+
 ## Stage A: Simulation (complete)
 
-The full system is simulated in software. 5 virtual trolleys navigate a store floor, scan items using a mock YOLOv8 pipeline with Kalman-style sensor fusion, and check out using a mock blockchain with real SHA256 block hashes.
+- [x] Backend API simulator with trolley walk, catalog, mock ledger and fusion
+- [x] Web dashboard: live map, scan feed, ledger, wallet cards
+- [x] Flutter app with home, cart and wallet screens
+- [x] Tests for checkout, pricing and fusion
 
-### Completed
-- [x] Backend API simulator (Node.js + TypeScript)
-- [x] 30+ product catalog with dynamic expiry-based pricing (Service A logic)
-- [x] Vision + weight fusion simulator with confidence scoring (Service B logic)
-- [x] Mock blockchain wallet service with Limited Overdraft smart contract (Service C logic)
-- [x] Rule-based AI recommendation engine (Service D logic)
-- [x] WebSocket real-time event feed (`TROLLEY_POSITIONS`, `SCAN_EVENT`, `CHECKOUT_EVENT`)
-- [x] Web dashboard (Next.js): live store map, scan feed, blockchain ledger, wallet cards
-- [x] Flutter mobile app scaffold (Home, Cart, Wallet screens with live WS connection)
-- [x] Full project documentation (architecture, API reference, stage READMEs)
-- [x] Tests for checkout, pricing and sensor fusion (`make test`)
+## Stage B: MVP Microservices (complete)
 
----
+- [x] **Service A**: Postgres catalog, chapter 4 pricing, Redis hot inventory with write-back, optimistic concurrency as the fallback. 40 of 40 concurrent picks succeed, up from 17 to 30 before Redis
+- [x] **Service B**: FastAPI, YOLOv8n on ONNX on CPU, burst voting, Bayesian fusion. A real photo of a banana gives `PRD-001` through the gateway, at about 45 ms a frame
+- [x] **Service C**: Solidity contracts on Hardhat or Besu
+- [x] **Service D**: item-item model trained on baskets, plus a LinUCB bandit rewarded by what customers add
+- [x] **Fleet engine**: the piece that connects everything, with carts that survive restarts
+- [x] **MQTT**: authenticated broker with per-role topics, simulator speaking only MQTT
+- [x] **Gateway**: JWT on every route, roles, rate limits, TLS option
+- [x] **Auth**: login, rotating refresh tokens, right to be forgotten
+- [x] **Dashboard** on stage B with login, tested in a real browser
+- [x] **Mobile app** on stage B with login and offline cache, tested against the live stack. Not yet run on a phone or emulator
+- [x] **End to end test**: `make e2e`, also in CI
 
-## Stage B: MVP Microservices (in progress)
+## Stage C: Production
 
-Break the monolith into real containerised services with actual databases and a message broker.
+### Software, tested without hardware
 
-### Progress
-- [x] **Service A**: NestJS + PostgreSQL product-core with stock levels, spec pricing rule and optimistic-concurrency `pick` (Redis cache still to do)
-- [ ] **Service B**: Python FastAPI + YOLOv8 ONNX (runs without GPU using CPU inference)
-- [x] **Service C**: Hardhat local chain + Solidity `SPMTToken.sol` + `Checkout.sol`, with contract tests
-- [ ] **Service D**: FastAPI service is up with a hand-written co-purchase matrix; trained collaborative filtering (scikit-surprise) still to do
-- [ ] **NGINX Gateway**: routing and health checks done; JWT validation and rate limiting still to do
-- [ ] **MQTT Broker**: Mosquitto runs in compose; nothing publishes or subscribes yet
-- [x] **Docker Compose**: `make stage-b` starts every service, with health-gated startup and catalog seeding
-- [ ] **Auth**: JWT login flow on mobile app and dashboard (mint is behind a shared admin token for now)
+- [x] **Besu with IBFT 2.0**: four validators, zero gas, survives one failure, halts safely on two. Measured on a laptop: 0.95 s per confirmed checkout, 42 checkouts a second. The spec's 1000+ TPS has not been shown
+- [x] **Kubernetes**: all services, deployed to a real local cluster and tested on both Hardhat and four Besu validators, including network policies blocking traffic and pods recovering
+- [x] **Metrics**: Prometheus with the spec's three metrics, Grafana dashboard
+- [x] **Tracing**: one add to cart traced through fleet and product core to Redis and Postgres in Jaeger
+- [x] **D\* Lite and A\***: layered costmap, matches a fresh A\* on random maps. On the store floor it replans in about 12 expansions against 1482 for starting over
+- [x] **ROS 2 node**: built and tested over real topics in a Humble container
 
-**Target stack:** Docker Compose, PostgreSQL 16, Redis 7, Hardhat, FastAPI, NestJS
+### Software written, not fully exercised
 
----
+- [ ] **ArgoCD**: the `Application` manifest exists, but it has never been applied to a cluster running ArgoCD
+- [ ] **Image publishing**: `.github/workflows/images.yml` runs on version tags, and no tag has been pushed yet
+- [ ] **Production overlay**: accepted by a Kubernetes API server in a dry run, but not deployed to a cloud account
+- [ ] **Istio mTLS**: the component exists, but it hasn't been run with Istio
+- [ ] **ESP32 firmware**: logic tested on a computer, compiles for an ESP32, has never run on a device. The calibration factor is a placeholder
+- [ ] **Training pipeline**: ran one epoch on the public coco8 sample, and the vision service loads the result. No store dataset exists, so nothing has been trained for real
+- [ ] **TensorRT export**: the script exists, but it needs a Jetson or Nvidia GPU
 
-## Stage C: Production Hardware (planned)
+### Needs things that can't be done from a laptop
 
-Deploy to real smart trolleys and a cloud Kubernetes cluster.
-
-### Hardware Milestones
-- [ ] Source hardware (Jetson Orin Nano, load cells, RPLIDAR A1, cameras)
-- [ ] Build prototype trolley chassis
-- [ ] Flash ESP32 firmware for HX711 weight ADC
-- [ ] Mount cameras and depth sensor
-
-### Software Milestones
-- [ ] Train YOLOv8-nano on store product images
-- [ ] Export to TensorRT (INT8 quantized) for Jetson
-- [ ] Write ROS 2 SLAM localisation node
-- [ ] Implement D* dynamic pathfinding for obstacle avoidance
-- [ ] Migrate Hardhat → Hyperledger Besu (private EVM, IBFT 2.0 consensus)
-- [ ] Kubernetes manifests for all services (EKS or GKE)
-- [x] CI: GitHub Actions runs every test suite on push
-- [ ] CD: ArgoCD → Kubernetes
-- [ ] Monitoring: Prometheus + Grafana dashboards
-- [ ] Distributed tracing: Jaeger
-
----
+- [ ] Source hardware: Jetson Orin Nano, load cells, RPLIDAR A1, cameras, about $1,200 a trolley
+- [ ] Build the chassis, mount sensors, flash and calibrate firmware
+- [ ] Photograph products and train on them. Until then the real model only recognises the 5 catalog items in COCO: banana, apple, orange, broccoli and carrot
+- [ ] SLAM on real LiDAR, testing navigation in Gazebo and on a real trolley
+- [ ] Geofencing and anti-tamper (chapter 10.2), which depend on trolley hardware
+- [ ] Store network: WiFi 6E, VLANs, BLE beacons, smart shelves
+- [ ] Payment provider for real fiat top-ups and overdraft recovery. `POST /api/wallet/mint` stands in for now
+- [ ] Legal review before handling real money or personal data. A stablecoin and an overdraft product are both regulated in most places
 
 ## Beyond Stage C
 
-- Smart shelf pressure-mat integration (secondary vision confirmation)
-- BLE beacon indoor positioning in Flutter app (maps user to aisle in real-time)
-- Federated Learning for privacy-preserving recommendation model updates
-- `$ASE-GOV` governance token (customers vote on store policies)
-- GDPR "Right to be Forgotten": anonymous ID mapping in off-chain SQL
+From the spec, not started:
+
+- Federated learning for recommendations
+- `$ASE-GOV` governance token
+- BLE indoor positioning in the app
+- Smart shelf integration as a second signal for vision

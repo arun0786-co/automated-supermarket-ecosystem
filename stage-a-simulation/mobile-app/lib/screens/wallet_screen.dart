@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../state/auth_state.dart';
 import '../state/wallet_state.dart';
 
 class WalletScreen extends StatelessWidget {
@@ -9,6 +10,7 @@ class WalletScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final wallet = context.watch<WalletState>();
     final isNegative = wallet.balance < 0;
+    final auth = context.read<AuthState?>();
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -16,11 +18,16 @@ class WalletScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF1E293B),
         title: const Text('Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (wallet.stale)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text('Offline. This is your last known balance.', style: TextStyle(color: Color(0xFFFBBF24), fontSize: 12)),
+              ),
             // balance card
             Container(
               width: double.infinity,
@@ -79,11 +86,65 @@ class WalletScreen extends StatelessWidget {
                   ? 'You can go down to ${wallet.overdraftLimit.toStringAsFixed(0)} SPMT at checkout'
                   : 'Subscribers can go below zero at checkout, up to their limit',
             ),
+
+            if (auth != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(onPressed: auth.logout, child: const Text('Log out')),
+              ),
+              TextButton(
+                onPressed: () => _confirmForget(context, auth),
+                child: const Text('Delete my account', style: TextStyle(color: Color(0xFFF87171))),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+// chapter 10.3: removes the link between this person and their on-chain history for good
+Future<void> _confirmForget(BuildContext context, AuthState auth) async {
+  final password = TextEditingController();
+  String? error;
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setState) => AlertDialog(
+        title: const Text('Delete my account'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('This removes your name, email and the link to your purchases. It cannot be undone.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: password,
+              obscureText: true,
+              decoration: InputDecoration(labelText: 'Password', errorText: error),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              final navigator = Navigator.of(dialogContext);
+              try {
+                await auth.forget(password.text);
+                navigator.pop();
+              } on AuthError catch (err) {
+                setState(() => error = err.message);
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Color(0xFFF87171))),
+          ),
+        ],
+      ),
+    ),
+  );
+  password.dispose();
 }
 
 class _InfoTile extends StatelessWidget {
