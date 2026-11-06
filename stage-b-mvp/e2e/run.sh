@@ -51,7 +51,7 @@ trap finish EXIT
 if ! compose up -d --build --wait --wait-timeout 600 --scale trolley-sim=0; then
   echo "stage B did not start"
   compose ps
-  compose logs --no-color --tail 40
+  compose logs --no-color --tail 300
   exit 1
 fi
 
@@ -83,6 +83,6 @@ if [ "$status" -eq 0 ]; then
 fi
 if [ "$status" -ne 0 ]; then
   compose ps
-  compose logs --no-color --tail 40
+  compose logs --no-color --tail 300
 fi
 exit "$status"
