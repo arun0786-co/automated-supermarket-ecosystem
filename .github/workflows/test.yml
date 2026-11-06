@@ -217,6 +217,15 @@ jobs:
         with:
           install_only: true
       - run: bash stage-c-production/k8s/test-on-kind.sh local
+      - name: show what the host blocked
+        if: failure()
+        run: |
+          uname -r
+          cat /sys/module/apparmor/parameters/enabled || true
+          ls /etc/apparmor.d | grep -i mosq || echo "no mosquitto file in /etc/apparmor.d"
+          sudo aa-status | grep -iE "mosquitto|profiles are loaded" || true
+          sudo grep -il mosquitto /etc/apparmor.d/* /etc/apparmor.d/*/* 2>/dev/null | head || true
+          sudo dmesg | grep -iE "apparmor.*(denied|mosquitto)" | tail -20 || echo "no apparmor denials in dmesg"
 
   stage-b-tls:
     runs-on: ubuntu-latest
