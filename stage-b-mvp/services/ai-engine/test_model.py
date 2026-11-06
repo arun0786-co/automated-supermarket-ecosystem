@@ -1,4 +1,6 @@
 import json
+import sys
+import threading
 
 import numpy as np
 import pytest
@@ -201,3 +203,52 @@ def test_bandit_state_survives_a_restart(tmp_path):
     again = trainer(tmp_path)
     assert again.bandit.score("B", AISLE_4_EVENING) == pytest.approx(t.bandit.score("B", AISLE_4_EVENING))
     assert again.status()["feedbackEvents"] == 20
+
+
+# fastapi runs these handlers in a thread pool, so a new product can arrive while the state saves
+def test_feedback_from_many_threads_at_once(tmp_path):
+    t = trainer(tmp_path)
+    workers, each = 8, 60
+    errors = []
+    start = threading.Barrier(workers)
+
+    def send(worker):
+        start.wait()
+        try:
+            for i in range(each):
+                sku = f"SKU-{worker}-{i}"
+                t.feedback(sku, AISLE_4_EVENING, 1)
+                t.bandit.score(sku, AISLE_4_EVENING)
+        except Exception as err:
+            errors.append(repr(err))
+
+    interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-5)
+    try:
+        threads = [threading.Thread(target=send, args=(w,)) for w in range(workers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+    finally:
+        sys.setswitchinterval(interval)
+
+    assert errors == []
+    assert t.feedback_events == workers * each
+    assert len(t.bandit.a_inverse) == workers * each
+    t.save()
+    assert len(trainer(tmp_path).bandit.a_inverse) == workers * each
+
+
+def test_retraining_never_publishes_an_untrained_model(monkeypatch):
+    t = trainer(retrain_every=1)
+    published = []
+    train = ItemItemModel.train
+
+    def spy(self, *args, **kwargs):
+        published.append(t.model is self)
+        train(self, *args, **kwargs)
+
+    monkeypatch.setattr(ItemItemModel, "train", spy)
+    t.add_purchase(["A", "B"])
+    assert published == [False]

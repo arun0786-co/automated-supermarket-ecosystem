@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 import time
 from typing import Iterable, Optional
 
@@ -96,6 +97,8 @@ class Trainer:
         self.feedback_events = 0
         self.pending = 0
         self.last_trained = 0.0
+        # fastapi runs the handlers on several threads. save runs inside the other locked methods
+        self._lock = threading.RLock()
         self._load()
         self._retrain()
 
@@ -117,26 +120,29 @@ class Trainer:
     def save(self) -> None:
         if not self.state_path:
             return
-        state = {"baskets": self.real, "bandit": self.bandit.to_json(), "feedbackEvents": self.feedback_events}
-        # write and rename, so a crash can't leave half a file behind
-        try:
-            directory = os.path.dirname(self.state_path) or "."
-            with tempfile.NamedTemporaryFile("w", dir=directory, delete=False, suffix=".tmp") as handle:
-                json.dump(state, handle)
-            os.replace(handle.name, self.state_path)
-        except OSError as err:
-            log.warning("could not save state: %s", err)
+        with self._lock:
+            state = {"baskets": self.real, "bandit": self.bandit.to_json(), "feedbackEvents": self.feedback_events}
+            # write and rename, so a crash can't leave half a file behind
+            try:
+                directory = os.path.dirname(self.state_path) or "."
+                with tempfile.NamedTemporaryFile("w", dir=directory, delete=False, suffix=".tmp") as handle:
+                    json.dump(state, handle)
+                os.replace(handle.name, self.state_path)
+            except OSError as err:
+                log.warning("could not save state: %s", err)
 
     def _retrain(self) -> None:
         # real baskets can include products the hand-written pairings never mention
-        self.model = ItemItemModel(sorted(set(self.seed_skus).union(*self.real)))
+        model = ItemItemModel(sorted(set(self.seed_skus).union(*self.real)))
         if len(self.real) >= self.real_only_after:
-            self.model.train(self.real)
+            model.train(self.real)
         else:
-            self.model.train(
+            model.train(
                 self.synthetic + self.real,
                 [1.0] * len(self.synthetic) + [REAL_BASKET_WEIGHT] * len(self.real),
             )
+        # recommendations read this without a lock, so it only goes live once trained
+        self.model = model
         self.pending = 0
         self.last_trained = time.time()
 
@@ -144,17 +150,19 @@ class Trainer:
         basket = sorted(set(skus))
         if len(basket) < 2:
             return
-        self.real.append(basket)
-        self.pending += 1
-        if self.pending >= self.retrain_every:
-            self._retrain()
-            self.save()
+        with self._lock:
+            self.real.append(basket)
+            self.pending += 1
+            if self.pending >= self.retrain_every:
+                self._retrain()
+                self.save()
 
     def feedback(self, sku: str, x: np.ndarray, reward: float) -> None:
         self.bandit.update(sku, x, reward)
-        self.feedback_events += 1
-        if self.feedback_events % SAVE_EVERY_FEEDBACK == 0:
-            self.save()
+        with self._lock:
+            self.feedback_events += 1
+            if self.feedback_events % SAVE_EVERY_FEEDBACK == 0:
+                self.save()
 
     def scores(self, cart: Iterable[str]) -> dict[str, float]:
         return self.model.scores(cart)
